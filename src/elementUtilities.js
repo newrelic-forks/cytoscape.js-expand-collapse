@@ -1,5 +1,4 @@
-const relayout = require("./reLayout");
-const { reLayout } = require("./reLayout");
+const { runLayoutAsync } = require("./layoutUtilities");
 
 function elementUtilities(cy) {
   return {
@@ -48,11 +47,35 @@ function elementUtilities(cy) {
       if (typeof layoutBy === "function") {
         layoutBy();
       } else if (layoutBy != null) {
-        var layout = cy.layout(layoutBy);
-        if (layout && layout.run) {
-          await reLayout(layout);
-          relayout(cy, layoutBy);
+        var hasGroups = !!cy
+          .nodes()
+          .filter((node) => node.data().type === "group").length;
+
+        if (hasGroups) {
+          // get positions of nodes before preset layout
+          const positions = {};
+          (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+            ({ nodeId, position }) => {
+              positions[nodeId] = position;
+            }
+          );
+
+          // run preset layout with the positions
+          await runLayoutAsync(
+            cy.layout({
+              name: "preset",
+              fit: false,
+              positions: positions,
+              zoom: cy.zoom(),
+              pan: cy.pan(),
+              padding: layoutBy?.padding ?? 50,
+              animate: layoutBy?.animate ?? true,
+              animationDuration: layoutBy?.animationDuration ?? 500,
+              animationEasing: layoutBy?.animationEasing,
+            })
+          );
         }
+        cy.scratch("_cyExpandCollapse").positions = null;
       }
     },
     convertToRenderedPosition: function (modelPosition) {

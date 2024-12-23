@@ -1,5 +1,5 @@
 {
-  "name": "nr-cytoscape-expand-collapse",
+  "name": "cytoscape-expand-collapse",
   "version": "1.0.0",
   "description": "This extension provides an interface to expand-collapse nodes",
   "main": "./src/index.js",
@@ -40,6 +40,7 @@
   },
   "peerDependencies": {
     "cytoscape": "^3.3.0",
-    "cytoscape-fcose": "^2.2.0"
+    "cytoscape-fcose": "^2.2.0",
+    "cytoscape-dagre": "^2.5.0"
   }
 }
