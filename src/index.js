@@ -522,8 +522,9 @@
       const targetElement = document.querySelector(
         ".map.__________cytoscape_container"
       );
+      const supportMapElement = document.getElementById("support-map");
 
-      if (targetElement) {
+      if (targetElement && !supportMapElement) {
         // Create a new div element
         const newElement = document.createElement("div");
 
@@ -539,8 +540,6 @@
           newElement,
           targetElement.nextSibling
         );
-      } else {
-        console.log("Element not found");
       }
 
       var options = getScratch(cy, "options") || {
