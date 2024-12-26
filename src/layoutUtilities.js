@@ -28,7 +28,7 @@ function getNodesByGroupLevels(nodes) {
     // Other levels
     else {
       // Calculate level based on the number of '::' in the parent
-      const level = parentId.split("::").length + 1;
+      const level = parentId.split("::").length;
 
       if (!levelGroups[level]) {
         levelGroups[level] = {};
@@ -44,15 +44,11 @@ function getNodesByGroupLevels(nodes) {
 
   // Convert the level groups to the required output format
   const result = Object.keys(levelGroups)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .map((level, index) => ({
-      level: index + 1, // Explicitly set length to 1, 2, etc.
-      items:
-        level === "1"
-          ? [levelGroups[level].root] // For length 1, combine everything into a single group
-          : Object.values(levelGroups[level]),
-    }))
-    .reverse();
+    .sort((a, b) => parseInt(b) - parseInt(a))
+    .map((level) => ({
+      level: level,
+      items: Object.values(levelGroups[level]),
+    }));
 
   return result ?? [];
 }
