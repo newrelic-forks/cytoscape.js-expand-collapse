@@ -107,8 +107,11 @@
       // collapse given eles extend options with given param
       api.collapse = async function (_eles, opts) {
         var eles = this.collapsibleNodes(_eles);
+        var options = getScratch(cy, "options");
+        var tempOptions = extendOptions(options, opts);
+        evalOptions(tempOptions);
 
-        if (opts?.isGroupBy) {
+        if (tempOptions?.isGroupBy) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
 
@@ -155,10 +158,6 @@
           }
         }
 
-        var options = getScratch(cy, "options");
-        var tempOptions = extendOptions(options, opts);
-        evalOptions(tempOptions);
-
         return expandCollapseUtilities.collapseGivenNodes(eles, tempOptions);
       };
 
@@ -178,7 +177,11 @@
 
       // expand given eles extend options with given param
       api.expand = async function (_eles, opts) {
-        if (opts?.isGroupBy) {
+        var options = getScratch(cy, "options");
+        var tempOptions = extendOptions(options, opts);
+        evalOptions(tempOptions);
+
+        if (tempOptions?.isGroupBy) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
 
@@ -221,10 +224,6 @@
         }
 
         var eles = this.expandableNodes(_eles);
-        var options = getScratch(cy, "options");
-        var tempOptions = extendOptions(options, opts);
-        evalOptions(tempOptions);
-
         return expandCollapseUtilities.expandGivenNodes(eles, tempOptions);
       };
 
