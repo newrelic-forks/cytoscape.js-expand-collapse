@@ -44,12 +44,10 @@ function elementUtilities(cy) {
       return roots;
     },
     rearrange: async function (layoutBy) {
-      if (typeof layoutBy === "function") {
-        layoutBy();
-      } else if (layoutBy != null) {
+      if (layoutBy) {
         var hasGroups = !!cy
           .nodes()
-          .filter((node) => node.data().type === "group").length;
+          .some((node) => node.data().type === "group");
 
         if (hasGroups) {
           // get positions of nodes before preset layout
@@ -64,16 +62,18 @@ function elementUtilities(cy) {
           await runLayoutAsync(
             cy.layout({
               name: "preset",
-              fit: false,
+              fit: !!layoutBy?.fit,
               positions: positions,
               zoom: cy.zoom(),
               pan: cy.pan(),
               padding: layoutBy?.padding ?? 50,
-              animate: layoutBy?.animate ?? true,
+              animate: !!layoutBy?.animate,
               animationDuration: layoutBy?.animationDuration ?? 500,
               animationEasing: layoutBy?.animationEasing,
             })
           );
+        } else {
+          await runLayoutAsync(cy.layout(layoutBy));
         }
         cy.scratch("_cyExpandCollapse").positions = null;
       }
