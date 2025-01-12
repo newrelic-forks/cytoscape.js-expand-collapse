@@ -45,11 +45,10 @@ function elementUtilities(cy) {
     },
     rearrange: async function (layoutBy) {
       if (layoutBy) {
-        var hasGroups = !!cy
+        var hasGroupsNodes = !!cy
           .nodes()
           .some((node) => node.data().type === "group");
-
-        if (hasGroups) {
+        if (hasGroupsNodes) {
           // get positions of nodes before preset layout
           const positions = {};
           (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(

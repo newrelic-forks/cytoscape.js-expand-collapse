@@ -111,7 +111,11 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        if (tempOptions?.isGroupBy) {
+        var hasGroupNodes = !!cy
+          .nodes()
+          .some((node) => node.data().type === "group");
+
+        if (hasGroupNodes) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
 
@@ -181,7 +185,11 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        if (tempOptions?.isGroupBy) {
+        var hasGroupNodes = !!cy
+          .nodes()
+          .some((node) => node.data().type === "group");
+
+        if (hasGroupNodes) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
 
@@ -561,7 +569,6 @@
         groupEdgesOfSameTypeOnCollapse: false,
         allowNestedEdgeCollapse: true,
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
-        isGroupBy: true,
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension
