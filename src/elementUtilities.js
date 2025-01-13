@@ -1,5 +1,4 @@
-const relayout = require("./reLayout");
-const { reLayout } = require("./reLayout");
+const { runLayoutAsync } = require("./layoutUtilities");
 
 function elementUtilities(cy) {
   return {
@@ -45,14 +44,37 @@ function elementUtilities(cy) {
       return roots;
     },
     rearrange: async function (layoutBy) {
-      if (typeof layoutBy === "function") {
-        layoutBy();
-      } else if (layoutBy != null) {
-        var layout = cy.layout(layoutBy);
-        if (layout && layout.run) {
-          await reLayout(layout);
-          relayout(cy, layoutBy);
+      if (layoutBy) {
+        var hasGroupsNodes = !!cy
+          .nodes()
+          .some((node) => node.data().type === "group");
+        if (hasGroupsNodes) {
+          // get positions of nodes before preset layout
+          const positions = {};
+          (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+            ({ nodeId, position }) => {
+              positions[nodeId] = position;
+            }
+          );
+
+          // run preset layout with the positions
+          await runLayoutAsync(
+            cy.layout({
+              name: "preset",
+              fit: !!layoutBy?.fit,
+              positions: positions,
+              zoom: cy.zoom(),
+              pan: cy.pan(),
+              padding: layoutBy?.padding ?? 50,
+              animate: !!layoutBy?.animate,
+              animationDuration: layoutBy?.animationDuration ?? 500,
+              animationEasing: layoutBy?.animationEasing,
+            })
+          );
+        } else {
+          await runLayoutAsync(cy.layout(layoutBy));
         }
+        cy.scratch("_cyExpandCollapse").positions = null;
       }
     },
     convertToRenderedPosition: function (modelPosition) {

@@ -9,6 +9,11 @@
 
     var undoRedoUtilities = require("./undoRedoUtilities");
     var cueUtilities = require("./cueUtilities");
+    const getSupportCy = require("./getSupportCy");
+    const {
+      runLayoutAsync,
+      resolveCompoundNodesOverlap,
+    } = require("./layoutUtilities");
     var saveLoadUtils = null;
 
     function extendOptions(options, extendBy) {
@@ -100,32 +105,133 @@
       // Collection functions
 
       // collapse given eles extend options with given param
-      api.collapse = function (_eles, opts) {
+      api.collapse = async function (_eles, opts) {
         var eles = this.collapsibleNodes(_eles);
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
+
+        var hasGroupNodes = !!cy
+          .nodes()
+          .some((node) => node.data().type === "group");
+
+        if (hasGroupNodes) {
+          // Get the support cytoscape instance
+          var supportCy = getSupportCy(cy);
+
+          // Get the support nodes corresponding to the elements to be collapsed
+          var supportNodes = eles.map((ele) => {
+            var supportNode = supportCy.getElementById(ele.id());
+            supportNode.toggleClass("expanded", false);
+            supportNode.toggleClass("cy-expand-collapse-collapsed-node", true);
+            supportNode.toggleClass("collapsed", true);
+            return supportNode;
+          });
+
+          if (supportNodes.length) {
+            // Collapse the support nodes
+            var collapsedNodesCollection = supportCy.collection(supportNodes);
+            expandCollapseUtilities.simpleCollapseGivenNodes(
+              collapsedNodesCollection
+            );
+
+            // Get the layout options from the scratchpad
+            var layoutBy = getScratch(cy, "options").layoutBy;
+
+            // Run the layout asynchronously without animation
+            await runLayoutAsync(
+              supportCy.layout({ ...layoutBy, animate: false })
+            );
+
+            // Resolve any compound nodes overlap without animation
+            await resolveCompoundNodesOverlap(supportCy, {
+              ...layoutBy,
+              animate: false,
+            });
+
+            var positions = supportCy.nodes().map((node) => ({
+              nodeId: node.id(),
+              position: node.position(),
+            }));
+
+            // Destroy the support cytoscape instance
+            supportCy.destroy();
+
+            // Save the positions in the scratchpad
+            setScratch(cy, "positions", positions);
+          }
+        }
 
         return expandCollapseUtilities.collapseGivenNodes(eles, tempOptions);
       };
 
       // collapse given eles recursively extend options with given param
-      api.collapseRecursively = function (_eles, opts) {
+      api.collapseRecursively = async function (_eles, opts) {
         var eles = this.collapsibleNodes(_eles);
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
+        var result = await this.collapse(
+          eles.union(eles.descendants()),
+          tempOptions
+        );
 
-        return this.collapse(eles.union(eles.descendants()), tempOptions);
+        return result;
       };
 
       // expand given eles extend options with given param
-      api.expand = function (_eles, opts) {
-        var eles = this.expandableNodes(_eles);
+      api.expand = async function (_eles, opts) {
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
+        var hasGroupNodes = !!cy
+          .nodes()
+          .some((node) => node.data().type === "group");
+
+        if (hasGroupNodes) {
+          // Get the support cytoscape instance
+          var supportCy = getSupportCy(cy);
+
+          // Get the support node corresponding to the element to be expanded
+          var supportNode = supportCy.getElementById(_eles.id());
+
+          // Restore the collapsed children of the support node
+          var restoredNodes = supportNode._private.data.collapsedChildren;
+          supportCy.add(restoredNodes);
+
+          // Update the classes of the support node to reflect its expanded state
+          supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
+          supportNode.toggleClass("collapsed", false);
+          supportNode.toggleClass("expanded", true);
+
+          // Get the layout options from the scratchpad
+          var layoutBy = getScratch(cy, "options").layoutBy;
+
+          // Run the layout asynchronously without animation
+          await runLayoutAsync(
+            supportCy.layout({ ...layoutBy, animate: false })
+          );
+
+          // Resolve any compound nodes overlap without animation
+          await resolveCompoundNodesOverlap(supportCy, {
+            ...layoutBy,
+            animate: false,
+          });
+
+          var positions = supportCy.nodes().map((node) => ({
+            nodeId: node.id(),
+            position: node.position(),
+          }));
+
+          // Destroy the support cytoscape instance
+          supportCy.destroy();
+
+          // Save the positions in the scratchpad
+          setScratch(cy, "positions", positions);
+        }
+
+        var eles = this.expandableNodes(_eles);
         return expandCollapseUtilities.expandGivenNodes(eles, tempOptions);
       };
 
@@ -142,12 +248,17 @@
       // Core functions
 
       // collapse all collapsible nodes
-      api.collapseAll = function (opts) {
+      api.collapseAll = async function (opts) {
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        return this.collapseRecursively(this.collapsibleNodes(), tempOptions);
+        var result = await this.collapseRecursively(
+          this.collapsibleNodes(),
+          tempOptions
+        );
+
+        return result;
       };
 
       // expand all expandable nodes
@@ -412,6 +523,31 @@
     // register the extension cy.expandCollapse()
     cytoscape("core", "expandCollapse", function (opts) {
       var cy = this;
+
+      // Create Support-Map Container
+      // Select the element with the class name "map __________cytoscape_container"
+      const targetElement = document.querySelector(
+        ".map.__________cytoscape_container"
+      );
+      const supportMapElement = document.getElementById("support-map");
+
+      if (targetElement && !supportMapElement) {
+        // Create a new div element
+        const newElement = document.createElement("div");
+
+        // Set the id attribute
+        newElement.id = "support-map";
+
+        // Set the style properties
+        newElement.style.zIndex = -1;
+        newElement.style.opacity = 0;
+
+        // Insert the new element as a sibling after the target element
+        targetElement.parentNode.insertBefore(
+          newElement,
+          targetElement.nextSibling
+        );
+      }
 
       var options = getScratch(cy, "options") || {
         layoutBy: null, // for rearrange after expand/collapse. It's just layout options or whole layout function. Choose your side!
