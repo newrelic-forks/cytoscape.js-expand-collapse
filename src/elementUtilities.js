@@ -1,4 +1,7 @@
-const { runLayoutAsync } = require("./layoutUtilities");
+const {
+  runLayoutAsync,
+  getClusterNodesExisitingInMap,
+} = require("./layoutUtilities");
 
 function elementUtilities(cy) {
   return {
@@ -63,8 +66,8 @@ function elementUtilities(cy) {
               name: "preset",
               fit: !!layoutBy?.fit,
               positions: positions,
-              zoom: cy.zoom(),
-              pan: cy.pan(),
+              // zoom: cy.zoom(),
+              // pan: cy.pan(),
               padding: layoutBy?.padding ?? 50,
               animate: !!layoutBy?.animate,
               animationDuration: layoutBy?.animationDuration ?? 500,
@@ -72,7 +75,12 @@ function elementUtilities(cy) {
             })
           );
         } else {
-          await runLayoutAsync(cy.layout(layoutBy));
+          // clusters only for CISE layout
+          var clusters = getClusterNodesExisitingInMap(
+            cy,
+            layoutBy?.clusters ?? []
+          );
+          await runLayoutAsync(cy.layout({ ...layoutBy, clusters: clusters }));
         }
         cy.scratch("_cyExpandCollapse").positions = null;
       }

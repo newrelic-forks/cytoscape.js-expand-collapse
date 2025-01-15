@@ -13,6 +13,7 @@
     const {
       runLayoutAsync,
       resolveCompoundNodesOverlap,
+      getClusterNodesExisitingInMap,
     } = require("./layoutUtilities");
     var saveLoadUtils = null;
 
@@ -138,14 +139,25 @@
             // Get the layout options from the scratchpad
             var layoutBy = getScratch(cy, "options").layoutBy;
 
+            // clusters only for CISE layout
+            var clusters = getClusterNodesExisitingInMap(
+              supportCy,
+              layoutBy?.clusters ?? []
+            );
+
             // Run the layout asynchronously without animation
             await runLayoutAsync(
-              supportCy.layout({ ...layoutBy, animate: false })
+              supportCy.layout({
+                ...layoutBy,
+                clusters: clusters,
+                animate: false,
+              })
             );
 
             // Resolve any compound nodes overlap without animation
             await resolveCompoundNodesOverlap(supportCy, {
               ...layoutBy,
+              clusters: [],
               animate: false,
             });
 
@@ -208,14 +220,25 @@
           // Get the layout options from the scratchpad
           var layoutBy = getScratch(cy, "options").layoutBy;
 
+          // clusters only for CISE layout
+          var clusters = getClusterNodesExisitingInMap(
+            supportCy,
+            layoutBy?.clusters ?? []
+          );
+
           // Run the layout asynchronously without animation
           await runLayoutAsync(
-            supportCy.layout({ ...layoutBy, animate: false })
+            supportCy.layout({
+              ...layoutBy,
+              clusters: clusters,
+              animate: false,
+            })
           );
 
           // Resolve any compound nodes overlap without animation
           await resolveCompoundNodesOverlap(supportCy, {
             ...layoutBy,
+            clusters: [],
             animate: false,
           });
 
