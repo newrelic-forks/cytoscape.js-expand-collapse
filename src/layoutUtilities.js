@@ -1,3 +1,21 @@
+function getClusterNodesExisitingInMap(cy, clusters) {
+  const updatedClusters = [];
+  clusters.forEach((cluster) => {
+    const updatedCluster = [];
+
+    cluster.forEach((nodeId) => {
+      if (cy.getElementById(nodeId).length) {
+        updatedCluster.push(nodeId);
+      }
+    });
+
+    if (updatedCluster.length) {
+      updatedClusters.push(updatedCluster);
+    }
+  });
+  return updatedClusters;
+}
+
 /**
  * Organizes nodes by their parent groups at each level.
  *
@@ -201,4 +219,8 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
   }
 }
 
-module.exports = { runLayoutAsync, resolveCompoundNodesOverlap };
+module.exports = {
+  runLayoutAsync,
+  resolveCompoundNodesOverlap,
+  getClusterNodesExisitingInMap,
+};
