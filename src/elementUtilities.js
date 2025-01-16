@@ -2,6 +2,7 @@ const {
   runLayoutAsync,
   getClusterNodesExisitingInMap,
 } = require("./layoutUtilities");
+const getSnapToGridOptions = require("./getSnapToGridOptions");
 
 function elementUtilities(cy) {
   return {
@@ -82,6 +83,7 @@ function elementUtilities(cy) {
           );
           await runLayoutAsync(cy.layout({ ...layoutBy, clusters: clusters }));
         }
+        cy.gridGuide?.(getSnapToGridOptions());
         cy.scratch("_cyExpandCollapse").positions = null;
       }
     },
