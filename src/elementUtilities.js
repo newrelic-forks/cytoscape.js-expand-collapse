@@ -83,7 +83,8 @@ function elementUtilities(cy) {
           );
           await runLayoutAsync(cy.layout({ ...layoutBy, clusters: clusters }));
         }
-        cy.gridGuide?.(getSnapToGridOptions());
+        cy?.gridGuide?.(getSnapToGridOptions());
+        cy.scratch("_gridGuide", {});
         cy.scratch("_cyExpandCollapse").positions = null;
       }
     },

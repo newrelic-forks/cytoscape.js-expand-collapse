@@ -6,7 +6,7 @@
     if (!cytoscape) {
       return;
     } // can't register if cytoscape unspecified
-
+    var gridGuide = require("cytoscape-grid-guide");
     var undoRedoUtilities = require("./undoRedoUtilities");
     var cueUtilities = require("./cueUtilities");
     const getSupportCy = require("./getSupportCy");
@@ -624,6 +624,9 @@
 
       return getScratch(cy, "api"); // Expose the API to the users
     });
+
+    // register the extension cy.gridGuide()
+    cytoscape.use(gridGuide);
   };
 
   if (typeof module !== "undefined" && module.exports) {
