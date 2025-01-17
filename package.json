@@ -1,6 +1,6 @@
 {
   "name": "nr-cytoscape-expand-collapse",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "This extension provides an interface to expand-collapse nodes",
   "main": "./src/index.js",
   "spm": {
@@ -39,7 +39,6 @@
     "webpack-cli": "^4.6.0"
   },
   "peerDependencies": {
-    "cytoscape-grid-guide": "^2.3.3",
     "cytoscape": "^3.3.0",
     "cytoscape-cise": "^2.0.0",
     "cytoscape-dagre": "^2.5.0",
