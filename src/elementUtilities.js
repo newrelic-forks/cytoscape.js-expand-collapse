@@ -82,6 +82,8 @@ function elementUtilities(cy) {
           );
           await runLayoutAsync(cy.layout({ ...layoutBy, clusters: clusters }));
         }
+
+        cy.scratch("_cyExpandCollapse")?.options?.layoutHandler?.();
         cy.scratch("_cyExpandCollapse").positions = null;
       }
     },
