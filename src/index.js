@@ -12,7 +12,7 @@
     const {
       runLayoutAsync,
       resolveCompoundNodesOverlap,
-      getClusterNodesExisitingInMap,
+      getCiseClusterNodesExisitingInMap,
     } = require("./layoutUtilities");
     var saveLoadUtils = null;
 
@@ -138,8 +138,8 @@
             // Get the layout options from the scratchpad
             var layoutBy = getScratch(cy, "options").layoutBy;
 
-            // clusters only for CISE layout
-            var clusters = getClusterNodesExisitingInMap(
+            // clusters of CISE layout
+            var ciseClusters = getCiseClusterNodesExisitingInMap(
               supportCy,
               layoutBy?.clusters ?? []
             );
@@ -148,7 +148,7 @@
             await runLayoutAsync(
               supportCy.layout({
                 ...layoutBy,
-                clusters: clusters,
+                clusters: ciseClusters,
                 animate: false,
               })
             );
@@ -219,8 +219,8 @@
           // Get the layout options from the scratchpad
           var layoutBy = getScratch(cy, "options").layoutBy;
 
-          // clusters only for CISE layout
-          var clusters = getClusterNodesExisitingInMap(
+          // clusters of CISE layout
+          var ciseClusters = getCiseClusterNodesExisitingInMap(
             supportCy,
             layoutBy?.clusters ?? []
           );
@@ -229,7 +229,7 @@
           await runLayoutAsync(
             supportCy.layout({
               ...layoutBy,
-              clusters: clusters,
+              clusters: ciseClusters,
               animate: false,
             })
           );
@@ -521,6 +521,78 @@
 
       api.saveJson = function (elems, filename) {
         return saveLoadUtils.saveJson(elems, filename);
+      };
+
+      // api for cluster operations
+      api.updateCluster = async function (cluster) {
+        await this.expand(cluster);
+        await this.collapse(cluster);
+
+        var collapsedChildren = this.getCollapsedChildren(cluster);
+        var defaultNodesCount = collapsedChildren
+          ? collapsedChildren.filter(
+              (child) => child.data("type") === "default"
+            ).length
+          : "0";
+
+        cluster.data("childCount", defaultNodesCount);
+      };
+
+      api.expandCluster = function (nodeIds, clusterId) {
+        const cluster = cy.getElementById(clusterId);
+
+        var clusterEdge;
+        cy.edges().forEach((edge) => {
+          if (
+            edge.data("source") === clusterId ||
+            edge.data("target") === clusterId
+          ) {
+            clusterEdge = edge;
+          }
+        });
+
+        var collapsedChildren = this.getCollapsedChildren(cluster);
+
+        nodeIds.forEach((nodeId) => {
+          var targetNode = collapsedChildren.find(
+            (child) => child.data("id") === nodeId
+          );
+          targetNode.restore();
+          targetNode.move({ parent: cluster.data("parent") ?? null });
+
+          var targetEdgeData = { ...clusterEdge?.data() };
+          var targetEdgeClasses = [...clusterEdge?.classes()];
+          var targetEdgeId = targetEdgeData?.id?.split?.("_");
+
+          if (targetEdgeData.source === cluster?.data?.()?.id) {
+            targetEdgeId[0] = targetNode.data().id;
+            targetEdgeData.source = targetNode.data().id;
+          } else if (targetEdgeData?.target === cluster?.data?.()?.id) {
+            targetEdgeId[2] = targetNode?.data?.()?.id;
+            targetEdgeData.target = targetNode.data().id;
+          }
+          targetEdgeId = targetEdgeId?.join?.("_");
+          targetEdgeData.id = targetEdgeId;
+
+          cy.add({
+            group: "edges",
+            data: targetEdgeData,
+            classes: targetEdgeClasses,
+          });
+        });
+
+        this.updateCluster(cluster);
+      };
+
+      api.collapseCluster = function (nodeIds, clusterId) {
+        var cluster = cy.getElementById(clusterId);
+
+        nodeIds.forEach((nodeId) => {
+          const node = cy.getElementById(nodeId);
+          node.move({ parent: clusterId });
+        });
+
+        this.updateCluster(cluster);
       };
 
       return api; // Return the API instance

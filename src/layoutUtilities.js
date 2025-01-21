@@ -1,6 +1,13 @@
-function getClusterNodesExisitingInMap(cy, clusters) {
+/**
+ * Filters out nodes from ciseClusters that do not exist in the given Cytoscape instance.
+ *
+ * @param {Object} cy - The Cytoscape instance.
+ * @param {Array} ciseClusters - An array of clusters, where each cluster is an array of node IDs.
+ * @returns {Array} An array of updated clusters, containing only the node IDs that exist in the Cytoscape instance.
+ */
+function getCiseClusterNodesExisitingInMap(cy, ciseClusters) {
   const updatedClusters = [];
-  clusters.forEach((cluster) => {
+  ciseClusters.forEach((cluster) => {
     const updatedCluster = [];
 
     cluster.forEach((nodeId) => {
@@ -222,5 +229,5 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
 module.exports = {
   runLayoutAsync,
   resolveCompoundNodesOverlap,
-  getClusterNodesExisitingInMap,
+  getCiseClusterNodesExisitingInMap,
 };
