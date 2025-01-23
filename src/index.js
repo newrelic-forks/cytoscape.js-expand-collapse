@@ -534,6 +534,9 @@
               (child) => child.data("type") === "default"
             ).length
           : "0";
+        if (String(defaultNodesCount) === "0") {
+          cy.remove(cluster);
+        }
 
         cluster.data("childCount", defaultNodesCount);
       };
