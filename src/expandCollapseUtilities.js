@@ -760,18 +760,22 @@ function expandCollapseUtilities(cy) {
         var currentTgtId = edge.data("target");
 
         if (currentSrcId === node.id()) {
-          edge = edge.move({
-            source: this.findNewEnd(originalEnds.source).id(),
-          });
+          if (originalEnds?.source) {
+            edge = edge.move({
+              source: this.findNewEnd(originalEnds.source).id(),
+            });
+          }
         } else {
-          edge = edge.move({
-            target: this.findNewEnd(originalEnds.target).id(),
-          });
+          if (originalEnds?.target) {
+            edge = edge.move({
+              target: this.findNewEnd(originalEnds.target).id(),
+            });
+          }
         }
 
         if (
-          edge.data("source") === originalEnds.source.id() &&
-          edge.data("target") === originalEnds.target.id()
+          edge.data("source") === originalEnds?.source?.id?.() &&
+          edge.data("target") === originalEnds?.target?.id?.()
         ) {
           edge.removeClass("cy-expand-collapse-meta-edge");
           edge.removeData("originalEnds");

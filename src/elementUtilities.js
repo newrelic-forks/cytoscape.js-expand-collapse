@@ -1,6 +1,7 @@
-const {
+var { repairClusterEdges } = require("./clusterUtilities");
+var {
   runLayoutAsync,
-  getClusterNodesExisitingInMap,
+  getCiseClusterNodesExisitingInMap,
 } = require("./layoutUtilities");
 
 function elementUtilities(cy) {
@@ -59,6 +60,7 @@ function elementUtilities(cy) {
               positions[nodeId] = position;
             }
           );
+          repairClusterEdges(cy);
 
           // run preset layout with the positions
           await runLayoutAsync(
@@ -66,8 +68,6 @@ function elementUtilities(cy) {
               name: "preset",
               fit: !!layoutBy?.fit,
               positions: positions,
-              // zoom: cy.zoom(),
-              // pan: cy.pan(),
               padding: layoutBy?.padding ?? 50,
               animate: !!layoutBy?.animate,
               animationDuration: layoutBy?.animationDuration ?? 500,
@@ -75,12 +75,16 @@ function elementUtilities(cy) {
             })
           );
         } else {
-          // clusters only for CISE layout
-          var clusters = getClusterNodesExisitingInMap(
+          repairClusterEdges(cy);
+
+          // clusters of CISE layout
+          var ciseClusters = getCiseClusterNodesExisitingInMap(
             cy,
             layoutBy?.clusters ?? []
           );
-          await runLayoutAsync(cy.layout({ ...layoutBy, clusters: clusters }));
+          await runLayoutAsync(
+            cy.layout({ ...layoutBy, clusters: ciseClusters })
+          );
         }
 
         cy.scratch("_cyExpandCollapse")?.options?.layoutHandler?.();
