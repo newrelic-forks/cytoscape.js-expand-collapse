@@ -560,25 +560,27 @@
           targetNode.restore();
           targetNode.move({ parent: cluster.data("parent") ?? null });
 
-          var targetEdgeData = { ...clusterEdge?.data() };
-          var targetEdgeClasses = [...clusterEdge?.classes()];
-          var targetEdgeId = targetEdgeData?.id?.split?.("_");
+          if (clusterEdge) {
+            var targetEdgeData = { ...clusterEdge?.data() };
+            var targetEdgeClasses = [...clusterEdge?.classes()];
+            var targetEdgeId = targetEdgeData?.id?.split?.("_");
 
-          if (targetEdgeData.source === cluster?.data?.()?.id) {
-            targetEdgeId[0] = targetNode.data().id;
-            targetEdgeData.source = targetNode.data().id;
-          } else if (targetEdgeData?.target === cluster?.data?.()?.id) {
-            targetEdgeId[2] = targetNode?.data?.()?.id;
-            targetEdgeData.target = targetNode.data().id;
+            if (targetEdgeData.source === cluster?.data?.()?.id) {
+              targetEdgeId[0] = targetNode.data().id;
+              targetEdgeData.source = targetNode.data().id;
+            } else if (targetEdgeData?.target === cluster?.data?.()?.id) {
+              targetEdgeId[2] = targetNode?.data?.()?.id;
+              targetEdgeData.target = targetNode.data().id;
+            }
+            targetEdgeId = targetEdgeId?.join?.("_");
+            targetEdgeData.id = targetEdgeId;
+
+            cy.add({
+              group: "edges",
+              data: targetEdgeData,
+              classes: targetEdgeClasses,
+            });
           }
-          targetEdgeId = targetEdgeId?.join?.("_");
-          targetEdgeData.id = targetEdgeId;
-
-          cy.add({
-            group: "edges",
-            data: targetEdgeData,
-            classes: targetEdgeClasses,
-          });
         });
 
         this.updateCluster(cluster);
