@@ -524,9 +524,9 @@
       };
 
       // api for cluster operations
-      api.updateCluster = async function (cluster) {
-        await this.expand(cluster);
-        await this.collapse(cluster);
+      api.updateCluster = async function (cluster, opts) {
+        await this.expand(cluster, opts);
+        await this.collapse(cluster, opts);
 
         var collapsedChildren = this.getCollapsedChildren(cluster);
         var defaultNodesCount = collapsedChildren
@@ -541,7 +541,7 @@
         cluster.data("childCount", defaultNodesCount);
       };
 
-      api.expandCluster = function (nodeIds, clusterId) {
+      api.expandCluster = async function (nodeIds, clusterId, opts) {
         const cluster = cy.getElementById(clusterId);
 
         var clusterEdge;
@@ -586,10 +586,10 @@
           }
         });
 
-        this.updateCluster(cluster);
+        await this.updateCluster(cluster, opts);
       };
 
-      api.collapseCluster = function (nodeIds, clusterId) {
+      api.collapseCluster = async function (nodeIds, clusterId, opts) {
         var cluster = cy.getElementById(clusterId);
 
         nodeIds.forEach((nodeId) => {
@@ -597,7 +597,7 @@
           node.move({ parent: clusterId });
         });
 
-        this.updateCluster(cluster);
+        await this.updateCluster(cluster, opts);
       };
 
       return api; // Return the API instance
