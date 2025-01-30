@@ -118,6 +118,9 @@
         if (hasGroupNodes) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
+          supportCy.scratch("_cyExpandCollapse", {
+            ...(cy.scratch("_cyExpandCollapse") ?? {}),
+          });
 
           // Get the support nodes corresponding to the elements to be collapsed
           var supportNodes = eles.map((ele) => {
@@ -130,8 +133,12 @@
 
           if (supportNodes.length) {
             // Collapse the support nodes
+
             var collapsedNodesCollection = supportCy.collection(supportNodes);
-            expandCollapseUtilities.simpleCollapseGivenNodes(
+
+            var supportExpandCollapseUtilities =
+              require("./expandCollapseUtilities")(supportCy);
+            supportExpandCollapseUtilities.simpleCollapseGivenNodes(
               collapsedNodesCollection
             );
 
@@ -203,18 +210,33 @@
         if (hasGroupNodes) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
+          // supportCy.scratch("_cyExpandCollapse", {
+          //   ...(cy.scratch("_cyExpandCollapse") ?? {}),
+          // });
 
           // Get the support node corresponding to the element to be expanded
           var supportNode = supportCy.getElementById(_eles.id());
 
           // Restore the collapsed children of the support node
-          var restoredNodes = supportNode._private.data.collapsedChildren;
-          supportCy.add(restoredNodes);
+          // console.log(supportCy.edges().length);
+          // var restoredNodes = supportNode._private.data.collapsedChildren;
+          // supportCy.add(restoredNodes);
+          // console.log(supportCy.edges().length);
 
           // Update the classes of the support node to reflect its expanded state
           supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
           supportNode.toggleClass("collapsed", false);
           supportNode.toggleClass("expanded", true);
+
+          var supportExpandCollapseUtilities =
+            require("./expandCollapseUtilities")(supportCy);
+
+          var expandNodesCollection = supportCy.collection([supportNode]);
+
+          supportExpandCollapseUtilities.simpleExpandGivenNodes(
+            expandNodesCollection,
+            false
+          );
 
           // Get the layout options from the scratchpad
           var layoutBy = getScratch(cy, "options").layoutBy;

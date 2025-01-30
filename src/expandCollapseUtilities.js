@@ -31,7 +31,19 @@ function expandCollapseUtilities(cy) {
 
       node.trigger("expandcollapse.beforeexpand");
       var restoredNodes = node._private.data.collapsedChildren;
-      restoredNodes.restore();
+      // restoredNodes.forEach((node) => {
+      //   var newNode = node.clone();
+      //   cy.add(newNode);
+
+      //   console.log(
+      //     "newNode",
+      //     cy.getElementById(newNode.id()),
+      //     cy.getElementById(newNode.id()).inside()
+      //   );
+      // });
+      cy.add(restoredNodes);
+      // restoredNodes.restore();
+
       var parentData = cy.scratch("_cyExpandCollapse").parentData;
       for (var i = 0; i < restoredNodes.length; i++) {
         delete parentData[restoredNodes[i].id()];
@@ -758,6 +770,12 @@ function expandCollapseUtilities(cy) {
         var originalEnds = edge.data("originalEnds");
         var currentSrcId = edge.data("source");
         var currentTgtId = edge.data("target");
+        var originalEndsSource = cy.getElementById(
+          originalEnds?.source?.id?.()
+        );
+        var originalEndsTarget = cy.getElementById(
+          originalEnds?.target?.id?.()
+        );
 
         if (currentSrcId === node.id()) {
           if (originalEnds?.source) {

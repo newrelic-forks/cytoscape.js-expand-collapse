@@ -78,6 +78,64 @@ function getNodesByGroupLevels(nodes) {
   return result ?? [];
 }
 
+function getExpandedNodeEdges(nodeId, cy) {
+  const childNodeIds = new Set();
+  cy.nodes().forEach((node) => {
+    if (node.data().parent === nodeId) {
+      childNodeIds.add(node.data().id);
+    }
+  });
+
+  const childNodeExternalSourceEdges = new Set();
+  const childNodeExternalTargetEdges = new Set();
+
+  cy.edges().forEach((edge) => {
+    const edgeId = edge?.data?.()?.id ?? "";
+    const [source, type, target] = edgeId?.split("_");
+
+    if (childNodeIds.has(source) && childNodeIds.has(target)) {
+      // return;
+    } else if (childNodeIds.has(source)) {
+      childNodeExternalSourceEdges.add(edge);
+    } else if (childNodeIds.has(target)) {
+      childNodeExternalTargetEdges.add(edge);
+    }
+  });
+  return {
+    sourceEdges: childNodeExternalSourceEdges,
+    targetEdges: childNodeExternalTargetEdges,
+  };
+}
+
+const uniqueEdgesMap = new Map();
+const addedEdgeIds = new Set();
+
+function repairConnectedEdgesOfGroupNode(nodeId, cy) {
+  let connectedEdges = cy.collection();
+
+  cy.edges().forEach((edge) => {
+    if (edge.data().source === nodeId || edge.data().target === nodeId) {
+      const edgeId = edge?.data?.()?.id ?? "";
+      const edgeType = edgeId?.split("_")[1];
+      const groupEdgeId =
+        edge.data().source + "_" + edgeType + "_" + edge.data().target;
+
+      let uniqueEdges = [];
+      if (!uniqueEdgesMap.has(groupEdgeId)) {
+        uniqueEdges.push(edge);
+      } else {
+        if (!addedEdgeIds.has(edge.data().id)) {
+          uniqueEdges = [...uniqueEdgesMap.get(groupEdgeId), edge];
+          addedEdgeIds.add(edge.data().id);
+        }
+      }
+      uniqueEdgesMap.set(groupEdgeId, uniqueEdges);
+    }
+  });
+
+  return connectedEdges;
+}
+
 /**
  * Runs the given layout asynchronously and returns a promise that resolves when the layout stops.
  *
@@ -109,7 +167,7 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
     return;
   }
   const nodesByGroupLevels = getNodesByGroupLevels(cy.nodes());
-
+  // console.log(cy.nodes());
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
     let removedCollection = cy.collection();
     let positioningSupportCollection = cy.collection();
@@ -117,9 +175,9 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
 
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
       const groupLevelNodes = nodesByGroupLevels[i].items[j];
-
       const newGroupLevelNodes = groupLevelNodes.map((node) => {
         //check if the node is expanded
+        // console.log("node", node.data(), node.classes(), node.isParent());
         if (
           !node.hasClass("cy-expand-collapse-collapsed-node") &&
           node.isParent()
@@ -146,8 +204,56 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
               y: node.position("y"),
             },
           };
+          const { sourceEdges, targetEdges } = getExpandedNodeEdges(
+            node.data().id,
+            cy
+          );
+          console.log("sourceEdges", sourceEdges);
+          console.log("targetEdges", targetEdges);
 
           cy.add(positioningSupportNode);
+          console.log("positioningSupportNode", cy.edges().length);
+          sourceEdges.forEach((edge) => {
+            const edgeId = edge?.data?.()?.id ?? "";
+            const [source, type, target] = edgeId?.split("_");
+            const newEdgeId = `${positioningSupportNodeId}_${type}_${
+              edge.data().target
+            }`;
+
+            if (!cy.getElementById(newEdgeId)?.length) {
+              cy.add({
+                group: "edges",
+                data: {
+                  ...edge.data(),
+                  id: newEdgeId,
+                  source: positioningSupportNodeId,
+                  target: edge.data().target,
+                },
+                classes: [...edge.classes()],
+              });
+            }
+          });
+
+          targetEdges.forEach((edge) => {
+            const edgeId = edge?.data?.()?.id ?? "";
+            const [source, type, target] = edgeId?.split("_");
+            const newEdgeId = `${
+              edge.data().source
+            }_${type}_${positioningSupportNodeId}`;
+            if (!cy.getElementById(newEdgeId)?.length) {
+              cy.add({
+                group: "edges",
+                data: {
+                  ...edge.data(),
+                  id: newEdgeId,
+                  source: edge.data().source,
+                  target: positioningSupportNodeId,
+                },
+                classes: [...edge.classes()],
+              });
+            }
+          });
+          console.log("positioningSupportNode", cy.edges().length);
           const removedNode = node.remove();
           removedCollection = removedCollection.union(removedNode);
           const newGroupLevelNode = cy.getElementById(positioningSupportNodeId);
@@ -157,9 +263,17 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
         }
         return node;
       });
+
       newGroupLevelNodesCollection =
         newGroupLevelNodesCollection.union(newGroupLevelNodes);
+      newGroupLevelNodesCollection = newGroupLevelNodesCollection.union(
+        newGroupLevelNodesCollection.connectedEdges()
+      );
     }
+    // console.log(
+    //   "newGroupLevelNodesCollection1",
+    //   newGroupLevelNodesCollection.length
+    // );
 
     // If all nodes are collapsed
     if (removedCollection.length === 0 && nodesByGroupLevels.length === 1) {
