@@ -167,7 +167,6 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
     return;
   }
   const nodesByGroupLevels = getNodesByGroupLevels(cy.nodes());
-  // console.log(cy.nodes());
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
     let removedCollection = cy.collection();
     let positioningSupportCollection = cy.collection();
@@ -177,7 +176,6 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
       const groupLevelNodes = nodesByGroupLevels[i].items[j];
       const newGroupLevelNodes = groupLevelNodes.map((node) => {
         //check if the node is expanded
-        // console.log("node", node.data(), node.classes(), node.isParent());
         if (
           !node.hasClass("cy-expand-collapse-collapsed-node") &&
           node.isParent()
@@ -208,11 +206,8 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
             node.data().id,
             cy
           );
-          console.log("sourceEdges", sourceEdges);
-          console.log("targetEdges", targetEdges);
 
           cy.add(positioningSupportNode);
-          console.log("positioningSupportNode", cy.edges().length);
           sourceEdges.forEach((edge) => {
             const edgeId = edge?.data?.()?.id ?? "";
             const [source, type, target] = edgeId?.split("_");
@@ -253,7 +248,6 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
               });
             }
           });
-          console.log("positioningSupportNode", cy.edges().length);
           const removedNode = node.remove();
           removedCollection = removedCollection.union(removedNode);
           const newGroupLevelNode = cy.getElementById(positioningSupportNodeId);
@@ -270,10 +264,6 @@ async function resolveCompoundNodesOverlap(cy, layoutBy) {
         newGroupLevelNodesCollection.connectedEdges()
       );
     }
-    // console.log(
-    //   "newGroupLevelNodesCollection1",
-    //   newGroupLevelNodesCollection.length
-    // );
 
     // If all nodes are collapsed
     if (removedCollection.length === 0 && nodesByGroupLevels.length === 1) {

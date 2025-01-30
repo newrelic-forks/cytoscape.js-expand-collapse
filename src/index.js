@@ -210,18 +210,16 @@
         if (hasGroupNodes) {
           // Get the support cytoscape instance
           var supportCy = getSupportCy(cy);
-          // supportCy.scratch("_cyExpandCollapse", {
-          //   ...(cy.scratch("_cyExpandCollapse") ?? {}),
-          // });
+          supportCy.scratch("_cyExpandCollapse", {
+            ...(cy.scratch("_cyExpandCollapse") ?? {}),
+          });
 
           // Get the support node corresponding to the element to be expanded
           var supportNode = supportCy.getElementById(_eles.id());
 
           // Restore the collapsed children of the support node
-          // console.log(supportCy.edges().length);
           // var restoredNodes = supportNode._private.data.collapsedChildren;
           // supportCy.add(restoredNodes);
-          // console.log(supportCy.edges().length);
 
           // Update the classes of the support node to reflect its expanded state
           supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);

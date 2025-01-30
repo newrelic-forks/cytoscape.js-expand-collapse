@@ -31,16 +31,6 @@ function expandCollapseUtilities(cy) {
 
       node.trigger("expandcollapse.beforeexpand");
       var restoredNodes = node._private.data.collapsedChildren;
-      // restoredNodes.forEach((node) => {
-      //   var newNode = node.clone();
-      //   cy.add(newNode);
-
-      //   console.log(
-      //     "newNode",
-      //     cy.getElementById(newNode.id()),
-      //     cy.getElementById(newNode.id()).inside()
-      //   );
-      // });
       cy.add(restoredNodes);
       // restoredNodes.restore();
 
