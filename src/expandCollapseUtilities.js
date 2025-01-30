@@ -743,7 +743,7 @@ function expandCollapseUtilities(cy) {
       var parentData = cy.scratch("_cyExpandCollapse").parentData;
       var parent = parentData[current.id()];
 
-      while (!current.inside()) {
+      while (!cy.getElementById(current.id()).inside()) {
         current = parent;
         parent = parentData[parent.id()];
       }
