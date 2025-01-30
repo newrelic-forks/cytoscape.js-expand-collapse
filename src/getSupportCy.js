@@ -20,11 +20,21 @@ function getSupportCy(cy) {
   cytoscape.use(fcose);
   cytoscape.use(dagre);
   cytoscape.use(cise);
+
+  const supportCyStyle = cyJson.style.map((item) => {
+    const newItem = { ...item };
+    if (newItem.style) {
+      delete newItem.style["line-gradient-stop-colors"];
+      delete newItem.style["line-gradient-stop-positions"];
+    }
+    return newItem;
+  });
+
   const supportCy = cytoscape({
     container: cont,
     elements: cyJson.elements,
     styleEnabled: true,
-    style: cyJson.style,
+    style: supportCyStyle,
   });
 
   return supportCy;
