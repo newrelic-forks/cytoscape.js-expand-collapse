@@ -47,7 +47,7 @@ function elementUtilities(cy) {
 
       return roots;
     },
-    rearrange: async function (layoutBy) {
+    rearrange: async function (layoutBy, layoutHandler) {
       if (layoutBy) {
         var hasGroupsNodes = !!cy
           .nodes()
@@ -87,7 +87,9 @@ function elementUtilities(cy) {
           );
         }
 
-        cy.scratch("_cyExpandCollapse")?.options?.layoutHandler?.();
+        if (layoutHandler) {
+          layoutHandler?.();
+        }
         cy.scratch("_cyExpandCollapse").positions = null;
       }
     },

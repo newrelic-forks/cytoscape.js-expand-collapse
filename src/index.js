@@ -8,8 +8,9 @@
     } // can't register if cytoscape unspecified
     var undoRedoUtilities = require("./undoRedoUtilities");
     var cueUtilities = require("./cueUtilities");
-    const getSupportCy = require("./getSupportCy");
-    const {
+    var getSupportCy = require("./getSupportCy");
+    var { repairClusterEdges } = require("./clusterUtilities");
+    var {
       runLayoutAsync,
       resolveCompoundNodesOverlap,
       getCiseClusterNodesExisitingInMap,
@@ -57,24 +58,127 @@
       function isOnly1Pair(edges) {
         let relatedEdgesArr = [];
         for (let i = 0; i < edges.length; i++) {
-          const srcId = edges[i].source().id();
-          const targetId = edges[i].target().id();
-          const obj = {};
+          var srcId = edges[i].source().id();
+          var targetId = edges[i].target().id();
+          var obj = {};
           obj[srcId] = true;
           obj[targetId] = true;
           relatedEdgesArr.push(obj);
         }
         for (let i = 0; i < relatedEdgesArr.length; i++) {
           for (let j = i + 1; j < relatedEdgesArr.length; j++) {
-            const keys1 = Object.keys(relatedEdgesArr[i]);
-            const keys2 = Object.keys(relatedEdgesArr[j]);
-            const allKeys = new Set(keys1.concat(keys2));
+            var keys1 = Object.keys(relatedEdgesArr[i]);
+            var keys2 = Object.keys(relatedEdgesArr[j]);
+            var allKeys = new Set(keys1.concat(keys2));
             if (allKeys.size != keys1.length || allKeys.size != keys2.length) {
               return false;
             }
           }
         }
         return true;
+      }
+
+      async function supportEndOperation(supportCy) {
+        // Get the layout options from the scratchpad
+        var layoutBy = getScratch(cy, "options").layoutBy;
+
+        // clusters of CISE layout
+        var ciseClusters = getCiseClusterNodesExisitingInMap(
+          supportCy,
+          layoutBy?.clusters ?? []
+        );
+
+        repairClusterEdges(supportCy);
+        // Run the layout asynchronously without animation
+        await runLayoutAsync(
+          supportCy.layout({
+            ...layoutBy,
+            clusters: ciseClusters,
+            animate: false,
+          })
+        );
+
+        // Resolve any compound nodes overlap without animation
+        await resolveCompoundNodesOverlap(supportCy, {
+          ...layoutBy,
+          clusters: [],
+          animate: false,
+        });
+
+        var positions = supportCy.nodes().map((node) => ({
+          nodeId: node.id(),
+          position: node.position(),
+        }));
+
+        // Destroy the support cytoscape instance
+        supportCy.destroy();
+
+        // Save the positions in the scratchpad
+        setScratch(cy, "positions", positions);
+      }
+
+      async function supportCollapse(eles) {
+        // Get the support cytoscape instance
+        var supportCy = getSupportCy(cy);
+        supportCy.scratch("_cyExpandCollapse", {
+          ...(cy.scratch("_cyExpandCollapse") ?? {}),
+        });
+
+        // Get the support nodes corresponding to the elements to be collapsed
+        var supportNodes = eles.map((ele) => {
+          var supportNode = supportCy.getElementById(ele.id());
+          supportNode.toggleClass("expanded", false);
+          supportNode.toggleClass("cy-expand-collapse-collapsed-node", true);
+          supportNode.toggleClass("collapsed", true);
+          return supportNode;
+        });
+
+        if (supportNodes.length) {
+          // Collapse the support nodes
+
+          var collapseNodesCollection = supportCy.collection(supportNodes);
+
+          var supportExpandCollapseUtilities =
+            require("./expandCollapseUtilities")(supportCy);
+          supportExpandCollapseUtilities.simpleCollapseGivenNodes(
+            collapseNodesCollection
+          );
+
+          await supportEndOperation(supportCy);
+        }
+      }
+
+      async function supportExpand(eles) {
+        // Get the support cytoscape instance
+        var supportCy = getSupportCy(cy);
+        supportCy.scratch("_cyExpandCollapse", {
+          ...(cy.scratch("_cyExpandCollapse") ?? {}),
+        });
+
+        // Get the support nodes corresponding to the elements to be collapsed
+        var supportNodes = eles.map((ele) => {
+          var supportNode = supportCy.getElementById(ele.id());
+          supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
+          supportNode.toggleClass("collapsed", false);
+          supportNode.toggleClass("expanded", true);
+          return supportNode;
+        });
+
+        if (supportNodes.length) {
+          // Expand the support nodes
+
+          var expandNodesCollection = supportCy.collection(supportNodes);
+
+          var supportExpandCollapseUtilities =
+            require("./expandCollapseUtilities")(supportCy);
+
+          supportExpandCollapseUtilities.simpleExpandGivenNodes(
+            expandNodesCollection,
+            false
+          );
+
+          await supportEndOperation(supportCy);
+        }
       }
 
       // set all options at once
@@ -116,69 +220,10 @@
           .some((node) => node.data().type === "group");
 
         if (hasGroupNodes) {
-          // Get the support cytoscape instance
-          var supportCy = getSupportCy(cy);
-          supportCy.scratch("_cyExpandCollapse", {
-            ...(cy.scratch("_cyExpandCollapse") ?? {}),
-          });
-
-          // Get the support nodes corresponding to the elements to be collapsed
-          var supportNodes = eles.map((ele) => {
-            var supportNode = supportCy.getElementById(ele.id());
-            supportNode.toggleClass("expanded", false);
-            supportNode.toggleClass("cy-expand-collapse-collapsed-node", true);
-            supportNode.toggleClass("collapsed", true);
-            return supportNode;
-          });
-
-          if (supportNodes.length) {
-            // Collapse the support nodes
-
-            var collapsedNodesCollection = supportCy.collection(supportNodes);
-
-            var supportExpandCollapseUtilities =
-              require("./expandCollapseUtilities")(supportCy);
-            supportExpandCollapseUtilities.simpleCollapseGivenNodes(
-              collapsedNodesCollection
-            );
-
-            // Get the layout options from the scratchpad
-            var layoutBy = getScratch(cy, "options").layoutBy;
-
-            // clusters of CISE layout
-            var ciseClusters = getCiseClusterNodesExisitingInMap(
-              supportCy,
-              layoutBy?.clusters ?? []
-            );
-
-            // Run the layout asynchronously without animation
-            await runLayoutAsync(
-              supportCy.layout({
-                ...layoutBy,
-                clusters: ciseClusters,
-                animate: false,
-              })
-            );
-
-            // Resolve any compound nodes overlap without animation
-            await resolveCompoundNodesOverlap(supportCy, {
-              ...layoutBy,
-              clusters: [],
-              animate: false,
-            });
-
-            var positions = supportCy.nodes().map((node) => ({
-              nodeId: node.id(),
-              position: node.position(),
-            }));
-
-            // Destroy the support cytoscape instance
-            supportCy.destroy();
-
-            // Save the positions in the scratchpad
-            setScratch(cy, "positions", positions);
-          }
+          await supportCollapse(eles);
         }
+
+        setScratch(cy, "tempOptions", tempOptions);
 
         return expandCollapseUtilities.collapseGivenNodes(eles, tempOptions);
       };
@@ -199,6 +244,7 @@
 
       // expand given eles extend options with given param
       api.expand = async function (_eles, opts) {
+        var eles = this.expandableNodes(_eles);
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
@@ -208,77 +254,16 @@
           .some((node) => node.data().type === "group");
 
         if (hasGroupNodes) {
-          // Get the support cytoscape instance
-          var supportCy = getSupportCy(cy);
-          supportCy.scratch("_cyExpandCollapse", {
-            ...(cy.scratch("_cyExpandCollapse") ?? {}),
-          });
-
-          // Get the support node corresponding to the element to be expanded
-          var supportNode = supportCy.getElementById(_eles.id());
-
-          // Restore the collapsed children of the support node
-          // var restoredNodes = supportNode._private.data.collapsedChildren;
-          // supportCy.add(restoredNodes);
-
-          // Update the classes of the support node to reflect its expanded state
-          supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
-          supportNode.toggleClass("collapsed", false);
-          supportNode.toggleClass("expanded", true);
-
-          var supportExpandCollapseUtilities =
-            require("./expandCollapseUtilities")(supportCy);
-
-          var expandNodesCollection = supportCy.collection([supportNode]);
-
-          supportExpandCollapseUtilities.simpleExpandGivenNodes(
-            expandNodesCollection,
-            false
-          );
-
-          // Get the layout options from the scratchpad
-          var layoutBy = getScratch(cy, "options").layoutBy;
-
-          // clusters of CISE layout
-          var ciseClusters = getCiseClusterNodesExisitingInMap(
-            supportCy,
-            layoutBy?.clusters ?? []
-          );
-
-          // Run the layout asynchronously without animation
-          await runLayoutAsync(
-            supportCy.layout({
-              ...layoutBy,
-              clusters: ciseClusters,
-              animate: false,
-            })
-          );
-
-          // Resolve any compound nodes overlap without animation
-          await resolveCompoundNodesOverlap(supportCy, {
-            ...layoutBy,
-            clusters: [],
-            animate: false,
-          });
-
-          var positions = supportCy.nodes().map((node) => ({
-            nodeId: node.id(),
-            position: node.position(),
-          }));
-
-          // Destroy the support cytoscape instance
-          supportCy.destroy();
-
-          // Save the positions in the scratchpad
-          setScratch(cy, "positions", positions);
+          await supportExpand(eles);
         }
 
-        var eles = this.expandableNodes(_eles);
+        setScratch(cy, "tempOptions", tempOptions);
+
         return expandCollapseUtilities.expandGivenNodes(eles, tempOptions);
       };
 
       // expand given eles recusively extend options with given param
-      api.expandRecursively = function (_eles, opts) {
+      api.expandRecursively = async function (_eles, opts) {
         var eles = this.expandableNodes(_eles);
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
@@ -458,7 +443,7 @@
         var result = { edges: cy.collection(), oldEdges: cy.collection() };
         nodesPairs.forEach(
           function (nodePair) {
-            const id1 = nodePair[1].id();
+            var id1 = nodePair[1].id();
             var edges = nodePair[0].connectedEdges(
               '[source = "' + id1 + '"],[target = "' + id1 + '"]'
             );
@@ -499,7 +484,7 @@
         nodesPairs.push(...nodes.map((x) => [x, x]));
         nodesPairs.forEach(
           function (nodePair) {
-            const id1 = nodePair[1].id();
+            var id1 = nodePair[1].id();
             var edges = nodePair[0].connectedEdges(
               '.cy-expand-collapse-collapsed-edge[source = "' +
                 id1 +
@@ -562,7 +547,7 @@
       };
 
       api.expandCluster = async function (nodeIds, clusterId, opts) {
-        const cluster = cy.getElementById(clusterId);
+        var cluster = cy.getElementById(clusterId);
 
         var clusterEdge;
         cy.edges().forEach((edge) => {
@@ -613,7 +598,7 @@
         var cluster = cy.getElementById(clusterId);
 
         nodeIds.forEach((nodeId) => {
-          const node = cy.getElementById(nodeId);
+          var node = cy.getElementById(nodeId);
           node.move({ parent: clusterId });
         });
 
@@ -645,14 +630,14 @@
 
       // Create Support-Map Container
       // Select the element with the class name "map __________cytoscape_container"
-      const targetElement = document.querySelector(
+      var targetElement = document.querySelector(
         ".map.__________cytoscape_container"
       );
-      const supportMapElement = document.getElementById("support-map");
+      var supportMapElement = document.getElementById("support-map");
 
       if (targetElement && !supportMapElement) {
         // Create a new div element
-        const newElement = document.createElement("div");
+        var newElement = document.createElement("div");
 
         // Set the id attribute
         newElement.id = "support-map";
