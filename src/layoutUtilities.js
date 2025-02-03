@@ -47,11 +47,11 @@ function runLayoutAsync(layout) {
 function getNodesByGroupLevels(nodes) {
   // Create a map to store nodes by their parent group at each level
   const levelGroups = {};
-  // Filter group nodes and process each node
-  const filteredNodes = nodes.filter((node) => node.data().type === "group");
+  // // Filter group nodes and process each node
+  // const filteredNodes = nodes.filter((node) => node.data().type === "group");
 
   // First, organize nodes by their parent groups
-  filteredNodes.forEach((node) => {
+  nodes.forEach((node) => {
     const parentId = node.data().parent;
 
     // Level 1 (root level)
@@ -62,11 +62,18 @@ function getNodesByGroupLevels(nodes) {
         };
       }
       levelGroups[1].root.push(node);
-    }
-    // Other levels
-    else {
-      // Calculate level based on the number of '::' in the parent
-      const level = parentId.split("::").length;
+    } else {
+      // Calculate level based on the parentId
+      let level = 1;
+      let currentNode = node;
+
+      // Traverse up the hierarchy to determine the level
+      while (currentNode.data().parent !== undefined) {
+        level++;
+        const parentNodeId = currentNode.data().parent;
+        currentNode = nodes.find((n) => n.data().id === parentNodeId);
+        if (!currentNode) break; // Break if parent node is not found
+      }
 
       if (!levelGroups[level]) {
         levelGroups[level] = {};
@@ -84,7 +91,7 @@ function getNodesByGroupLevels(nodes) {
   const result = Object.keys(levelGroups)
     .sort((a, b) => parseInt(b) - parseInt(a))
     .map((level) => ({
-      level: level,
+      level: parseInt(level),
       items: Object.values(levelGroups[level]),
     }));
 
@@ -238,7 +245,7 @@ function getSupportCollapsedGroupsEdges(groupLevelNodes, cy) {
   let collapsedGroupNodes = cy.collection();
   const collapsedGroupNodesIds = new Set();
   groupLevelNodes.forEach((node) => {
-    if (node.hasClass("cy-expand-collapse-collapsed-node")) {
+    if (!node.isParent()) {
       collapsedGroupNodesIds.add(node.data().id);
       collapsedGroupNodes = collapsedGroupNodes.union(node);
     }
@@ -287,6 +294,8 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
     return;
   }
   const nodesByGroupLevels = getNodesByGroupLevels(supportCy.nodes());
+
+  console.log("nodesByGroupLevels", nodesByGroupLevels);
 
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
     let removedCollection = supportCy.collection();
