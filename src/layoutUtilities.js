@@ -303,11 +303,15 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
       supportCy
     );
 
+    let isAnyNodeGroup = false;
     // Adding support nodes for expanded groups to each group level
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
       const groupLevelNodesOfAGroup = nodesByGroupLevels[i].items[j];
       const newGroupLevelNodesOfAGroup = groupLevelNodesOfAGroup.map((node) => {
         //check if the node is expanded
+        if (node.isNode() && node.data().type === "group") {
+          isAnyNodeGroup = true;
+        }
         if (
           !node.hasClass("cy-expand-collapse-collapsed-node") &&
           node.isParent()
@@ -380,7 +384,22 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
     });
 
     // Run the layout with support nodes and edges
-    const reArrange = groupLevelNodesEdgesCollection.layout(layoutBy);
+    let layoutOptions = { ...layoutBy };
+    if (isAnyNodeGroup) {
+      layoutOptions = {
+        ...layoutBy,
+        cols: layoutBy?.compoundCols ?? layoutBy?.cols,
+        rows: layoutBy?.compoundRows ?? layoutBy?.rows,
+      };
+    } else {
+      layoutOptions = {
+        ...layoutBy,
+        cols: layoutBy?.cols,
+        rows: layoutBy?.rows,
+      };
+    }
+
+    const reArrange = groupLevelNodesEdgesCollection.layout(layoutOptions);
     await runLayoutAsync(reArrange);
 
     // Restore the original nodes
