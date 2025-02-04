@@ -89,14 +89,6 @@
         );
 
         repairClusterEdges(supportCy);
-        // Run the layout asynchronously without animation
-        await runLayoutAsync(
-          supportCy.layout({
-            ...layoutBy,
-            clusters: ciseClusters,
-            animate: false,
-          })
-        );
 
         // Resolve any compound nodes overlap without animation
         await resolveCompoundNodesOverlap(supportCy, {

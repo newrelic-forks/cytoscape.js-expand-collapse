@@ -44,14 +44,14 @@ function runLayoutAsync(layout) {
  *   - `level` (number): The level number (1, 2, etc.).
  *   - `items` (Array): An array of node groups at that level. For level 1, all nodes are combined into a single group.
  */
-function getNodesByGroupLevels(nodes) {
+function getNodesByGroupLevels(cy) {
   // Create a map to store nodes by their parent group at each level
   const levelGroups = {};
-  // Filter group nodes and process each node
-  const filteredNodes = nodes.filter((node) => node.data().type === "group");
+
+  const nodes = cy.nodes();
 
   // First, organize nodes by their parent groups
-  filteredNodes.forEach((node) => {
+  nodes.forEach((node) => {
     const parentId = node.data().parent;
 
     // Level 1 (root level)
@@ -62,11 +62,18 @@ function getNodesByGroupLevels(nodes) {
         };
       }
       levelGroups[1].root.push(node);
-    }
-    // Other levels
-    else {
-      // Calculate level based on the number of '::' in the parent
-      const level = parentId.split("::").length;
+    } else {
+      // Calculate level based on the parentId
+      let level = 1;
+      let currentNode = node;
+
+      // Traverse up the hierarchy to determine the level
+      while (currentNode.data().parent !== undefined) {
+        level++;
+        const parentNodeId = currentNode.data().parent;
+        currentNode = cy.getElementById(parentNodeId);
+        if (!currentNode) break; // Break if parent node is not found
+      }
 
       if (!levelGroups[level]) {
         levelGroups[level] = {};
@@ -84,7 +91,7 @@ function getNodesByGroupLevels(nodes) {
   const result = Object.keys(levelGroups)
     .sort((a, b) => parseInt(b) - parseInt(a))
     .map((level) => ({
-      level: level,
+      level: parseInt(level),
       items: Object.values(levelGroups[level]),
     }));
 
@@ -92,13 +99,13 @@ function getNodesByGroupLevels(nodes) {
 }
 
 /**
- * Retrieves the edge ID with a specified prefix if the node is not collapsed and is a parent.
+ * Retrieves the edge ID with a specified prefix if the node is expanded and is a parent.
  *
  * @param {string} id - The ID of the edge.
  * @param {string} parentId - The ID of the parent node.
  * @param {Object} cy - The Cytoscape instance.
  * @param {string} [prefix="support"] - The prefix to add to the edge ID if conditions are met.
- * @returns {string} - The edge ID with the prefix if the node is not collapsed and is a parent, otherwise the original edge ID.
+ * @returns {string} - The edge ID with the prefix if the node is expanded and is a parent, otherwise the original edge ID.
  */
 function getEdgeIdWithPrefix(id, parentId, cy, prefix = "support") {
   const edgeId = getEdgeOutermostId(id, parentId, cy);
@@ -228,45 +235,45 @@ function getSupportExpandedGroupsEdges(groupLevelNodes, cy) {
 }
 
 /**
- * Retrieves the edges of support collapsed groups within a Cytoscape instance.
+ * Retrieves the edges of support non-expanded nodes within a Cytoscape instance.
  *
  * @param {Array} groupLevelNodes - An array of group level nodes.
  * @param {Object} cy - The Cytoscape instance.
- * @returns {Object} A collection of edges of support collapsed groups.
+ * @returns {Object} A collection of edges of support non-expanded nodes.
  */
-function getSupportCollapsedGroupsEdges(groupLevelNodes, cy) {
-  let collapsedGroupNodes = cy.collection();
-  const collapsedGroupNodesIds = new Set();
+function getSupportNonExpandedGroupsEdges(groupLevelNodes, cy) {
+  let nonExpandedGroupsNodes = cy.collection();
+  const nonExpandedGroupsNodesIds = new Set();
   groupLevelNodes.forEach((node) => {
-    if (node.hasClass("cy-expand-collapse-collapsed-node")) {
-      collapsedGroupNodesIds.add(node.data().id);
-      collapsedGroupNodes = collapsedGroupNodes.union(node);
+    if (!node.isParent()) {
+      nonExpandedGroupsNodesIds.add(node.data().id);
+      nonExpandedGroupsNodes = nonExpandedGroupsNodes.union(node);
     }
   });
 
-  const supportCollapsedGroupsEdges = new Map();
-  collapsedGroupNodes.connectedEdges().forEach((edge) => {
+  const supportNonExpandedGroupsEdges = new Map();
+  nonExpandedGroupsNodes.connectedEdges().forEach((edge) => {
     const sourceId = edge.data().source;
     const targetId = edge.data().target;
     const label = edge.data().label;
     if (
-      collapsedGroupNodesIds.has(sourceId) &&
-      collapsedGroupNodesIds.has(targetId)
+      nonExpandedGroupsNodesIds.has(sourceId) &&
+      nonExpandedGroupsNodesIds.has(targetId)
     ) {
       const edgeId = `${sourceId}_${label}_${targetId}`;
-      if (!supportCollapsedGroupsEdges.has(edgeId)) {
-        supportCollapsedGroupsEdges.set(edgeId, edge);
+      if (!supportNonExpandedGroupsEdges.has(edgeId)) {
+        supportNonExpandedGroupsEdges.set(edgeId, edge);
       }
     }
   });
 
-  let supportCollapsedGroupsEdgesCollection = cy.collection();
-  supportCollapsedGroupsEdges.forEach((edge) => {
-    supportCollapsedGroupsEdgesCollection =
-      supportCollapsedGroupsEdgesCollection.union(edge);
+  let supportNonExpandedGroupsEdgesCollection = cy.collection();
+  supportNonExpandedGroupsEdges.forEach((edge) => {
+    supportNonExpandedGroupsEdgesCollection =
+      supportNonExpandedGroupsEdgesCollection.union(edge);
   });
 
-  return supportCollapsedGroupsEdgesCollection;
+  return supportNonExpandedGroupsEdgesCollection;
 }
 
 /**
@@ -279,14 +286,7 @@ function getSupportCollapsedGroupsEdges(groupLevelNodes, cy) {
  */
 async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
   const elementUtilities = require("./elementUtilities")(supportCy);
-  const positioningSupportNodes = supportCy
-    .nodes()
-    .filter((node) => node.data().type === "positioning-support");
-
-  if (positioningSupportNodes.length) {
-    return;
-  }
-  const nodesByGroupLevels = getNodesByGroupLevels(supportCy.nodes());
+  const nodesByGroupLevels = getNodesByGroupLevels(supportCy);
 
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
     let removedCollection = supportCy.collection();
@@ -354,13 +354,13 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
       );
     }
 
-    // Adding edges into collection for support collapsed groups
-    const supportCollapsedGroupsEdges = getSupportCollapsedGroupsEdges(
+    // Adding edges into collection for support non-expanded nodes
+    const supportNonExpandedGroupsEdges = getSupportNonExpandedGroupsEdges(
       groupLevelNodesEdgesCollection,
       supportCy
     );
     groupLevelNodesEdgesCollection = groupLevelNodesEdgesCollection.union(
-      supportCollapsedGroupsEdges
+      supportNonExpandedGroupsEdges
     );
 
     // Adding edges into collection for support expanded groups
