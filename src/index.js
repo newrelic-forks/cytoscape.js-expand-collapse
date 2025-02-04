@@ -95,8 +95,6 @@
           ...layoutBy,
           clusters: [],
           animate: false,
-          rows: layoutBy.compoundRows ?? layoutBy.rows,
-          cols: layoutBy.compoundCols ?? layoutBy.cols,
         });
 
         var positions = supportCy.nodes().map((node) => ({
