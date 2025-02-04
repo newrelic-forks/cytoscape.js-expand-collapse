@@ -31,7 +31,9 @@ function expandCollapseUtilities(cy) {
 
       node.trigger("expandcollapse.beforeexpand");
       var restoredNodes = node._private.data.collapsedChildren;
-      restoredNodes.restore();
+      cy.add(restoredNodes);
+      // restoredNodes.restore();
+
       var parentData = cy.scratch("_cyExpandCollapse").parentData;
       for (var i = 0; i < restoredNodes.length; i++) {
         delete parentData[restoredNodes[i].id()];
@@ -102,24 +104,30 @@ function expandCollapseUtilities(cy) {
      */
     endOperation: function (layoutBy, nodes) {
       var self = this;
+      var layoutHandler =
+        cy.scratch("_cyExpandCollapse")?.tempOptions?.layoutHandler ??
+        cy.scratch("_cyExpandCollapse")?.options?.layoutHandler;
+
       cy.ready(function () {
         setTimeout(function () {
-          elementUtilities.rearrange(layoutBy);
+          elementUtilities.rearrange(layoutBy, layoutHandler);
           if (cy.scratch("_cyExpandCollapse").selectableChanged) {
             nodes.selectify();
             cy.scratch("_cyExpandCollapse").selectableChanged = false;
           }
         }, 0);
       });
+      cy.scratch("_cyExpandCollapse").tempOptions.layoutHandler =
+        cy.scratch("_cyExpandCollapse")?.options?.layoutHandler;
     },
     /*
      * Calls simple expandAllNodes. Then performs end operation.
      */
     expandAllNodes: function (nodes, options) {
       //*//
-      var expandedStack = this.simpleExpandAllNodes(nodes, options.fisheye);
+      var expandedStack = this.simpleExpandAllNodes(nodes, options?.fisheye);
 
-      this.endOperation(options.layoutBy, nodes);
+      this.endOperation(options?.layoutBy, nodes);
 
       /*
        * return the nodes to undo the operation
@@ -149,17 +157,17 @@ function expandCollapseUtilities(cy) {
           // Expand the given node the third parameter indicates that the node is simple which ensures that fisheye parameter will be considered
           this.expandNode(
             node,
-            options.fisheye,
+            options?.fisheye,
             true,
-            options.animate,
-            options.layoutBy,
-            options.animationDuration
+            options?.animate,
+            options?.layoutBy,
+            options?.animationDuration
           );
         }
       } else {
         // First expand given nodes and then perform layout according to the layoutBy parameter
-        this.simpleExpandGivenNodes(nodes, options.fisheye);
-        this.endOperation(options.layoutBy, nodes);
+        this.simpleExpandGivenNodes(nodes, options?.fisheye);
+        this.endOperation(options?.layoutBy, nodes);
       }
 
       /*
@@ -178,7 +186,7 @@ function expandCollapseUtilities(cy) {
       cy.endBatch();
 
       nodes.trigger("position"); // position not triggered by default when collapseNode is called
-      this.endOperation(options.layoutBy, nodes);
+      this.endOperation(options?.layoutBy, nodes);
 
       // Update the style
       cy.style().update();
@@ -741,7 +749,7 @@ function expandCollapseUtilities(cy) {
       var parentData = cy.scratch("_cyExpandCollapse").parentData;
       var parent = parentData[current.id()];
 
-      while (!current.inside()) {
+      while (!cy.getElementById(current.id()).inside()) {
         current = parent;
         parent = parentData[parent.id()];
       }
@@ -758,6 +766,12 @@ function expandCollapseUtilities(cy) {
         var originalEnds = edge.data("originalEnds");
         var currentSrcId = edge.data("source");
         var currentTgtId = edge.data("target");
+        var originalEndsSource = cy.getElementById(
+          originalEnds?.source?.id?.()
+        );
+        var originalEndsTarget = cy.getElementById(
+          originalEnds?.target?.id?.()
+        );
 
         if (currentSrcId === node.id()) {
           if (originalEnds?.source) {
@@ -821,14 +835,14 @@ function expandCollapseUtilities(cy) {
       var nodes = edges.connectedNodes();
       var edgesToCollapse = {};
       // group edges by type if this option is set to true
-      if (options.groupEdgesOfSameTypeOnCollapse) {
+      if (options?.groupEdgesOfSameTypeOnCollapse) {
         edges.forEach(function (edge) {
           var edgeType = "unknown";
-          if (options.edgeTypeInfo !== undefined) {
+          if (options?.edgeTypeInfo !== undefined) {
             edgeType =
-              options.edgeTypeInfo instanceof Function
-                ? options.edgeTypeInfo.call(edge)
-                : edge.data()[options.edgeTypeInfo];
+              options?.edgeTypeInfo instanceof Function
+                ? options?.edgeTypeInfo.call(edge)
+                : edge.data()[options?.edgeTypeInfo];
           }
           if (edgesToCollapse.hasOwnProperty(edgeType)) {
             edgesToCollapse[edgeType].edges =
@@ -912,11 +926,11 @@ function expandCollapseUtilities(cy) {
         );
 
         var edgesTypeField = "edgeType";
-        if (options.edgeTypeInfo !== undefined) {
+        if (options?.edgeTypeInfo !== undefined) {
           edgesTypeField =
-            options.edgeTypeInfo instanceof Function
+            options?.edgeTypeInfo instanceof Function
               ? edgesTypeField
-              : options.edgeTypeInfo;
+              : options?.edgeTypeInfo;
         }
         newEdge.data[edgesTypeField] = edgeGroupType;
 
@@ -934,7 +948,7 @@ function expandCollapseUtilities(cy) {
     },
 
     check4nestedCollapse: function (edges2collapse, options) {
-      if (options.allowNestedEdgeCollapse) {
+      if (options?.allowNestedEdgeCollapse) {
         return edges2collapse;
       }
       let r = cy.collection();
