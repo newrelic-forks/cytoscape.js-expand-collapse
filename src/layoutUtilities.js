@@ -277,6 +277,38 @@ function getSupportNonExpandedGroupsEdges(groupLevelNodes, cy) {
 }
 
 /**
+ * Generates layout options based on the provided parameters.
+ *
+ * @param {Object} layoutBy - The default layout configuration.
+ * @param {Object} groupLayoutBy - The layout configuration for group nodes.
+ * @param {boolean} isAnyNodeGroup - A flag indicating if any node is part of a group.
+ * @returns {Object} The computed layout options.
+ */
+function getLayoutOptions(layoutBy, groupLayoutBy, isAnyNodeGroup) {
+  let layoutOptions;
+  if (groupLayoutBy && isAnyNodeGroup) {
+    layoutOptions = {
+      ...groupLayoutBy,
+      cols: groupLayoutBy?.compoundCols ?? groupLayoutBy?.cols,
+      rows: groupLayoutBy?.compoundRows ?? groupLayoutBy?.rows,
+    };
+  } else if (isAnyNodeGroup) {
+    layoutOptions = {
+      ...layoutBy,
+      cols: layoutBy?.compoundCols ?? layoutBy?.cols,
+      rows: layoutBy?.compoundRows ?? layoutBy?.rows,
+    };
+  } else {
+    layoutOptions = {
+      ...layoutBy,
+      cols: layoutBy?.cols,
+      rows: layoutBy?.rows,
+    };
+  }
+  return layoutOptions;
+}
+
+/**
  * Resolves overlap of compound nodes in a cytoscape instance by temporarily replacing expanded nodes with positioning support nodes,
  * running the specified layout, and then restoring the original nodes.
  *
@@ -284,7 +316,7 @@ function getSupportNonExpandedGroupsEdges(groupLevelNodes, cy) {
  * @param {Object} layoutBy - The layout options to be used for arranging the nodes.
  * @returns {Promise<void>} A promise that resolves when the layout has been applied and nodes have been restored.
  */
-async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
+async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy) {
   const elementUtilities = require("./elementUtilities")(supportCy);
   const nodesByGroupLevels = getNodesByGroupLevels(supportCy);
 
@@ -384,20 +416,11 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy) {
     });
 
     // Run the layout with support nodes and edges
-    let layoutOptions = { ...layoutBy };
-    if (isAnyNodeGroup) {
-      layoutOptions = {
-        ...layoutBy,
-        cols: layoutBy?.compoundCols ?? layoutBy?.cols,
-        rows: layoutBy?.compoundRows ?? layoutBy?.rows,
-      };
-    } else {
-      layoutOptions = {
-        ...layoutBy,
-        cols: layoutBy?.cols,
-        rows: layoutBy?.rows,
-      };
-    }
+    const layoutOptions = getLayoutOptions(
+      layoutBy,
+      groupLayoutBy,
+      isAnyNodeGroup
+    );
 
     const reArrange = groupLevelNodesEdgesCollection.layout(layoutOptions);
     await runLayoutAsync(reArrange);
