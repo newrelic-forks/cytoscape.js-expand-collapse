@@ -81,6 +81,7 @@
       async function supportEndOperation(supportCy) {
         // Get the layout options from the scratchpad
         var layoutBy = getScratch(cy, "options").layoutBy;
+        var groupLayoutBy = getScratch(cy, "options").groupLayoutBy;
 
         // clusters of CISE layout
         var ciseClusters = getCiseClusterNodesExisitingInMap(
@@ -91,13 +92,15 @@
         repairClusterEdges(supportCy);
 
         // Resolve any compound nodes overlap without animation
-        await resolveCompoundNodesOverlap(supportCy, {
-          ...layoutBy,
-          clusters: [],
-          animate: false,
-          rows: layoutBy.compoundRows ?? layoutBy.rows,
-          cols: layoutBy.compoundCols ?? layoutBy.cols,
-        });
+        await resolveCompoundNodesOverlap(
+          supportCy,
+          {
+            ...layoutBy,
+            clusters: ciseClusters,
+            animate: false,
+          },
+          { ...groupLayoutBy, clusters: ciseClusters, animate: false }
+        );
 
         var positions = supportCy.nodes().map((node) => ({
           nodeId: node.id(),
@@ -649,6 +652,7 @@
 
       var options = getScratch(cy, "options") || {
         layoutBy: null, // for rearrange after expand/collapse. It's just layout options or whole layout function. Choose your side!
+        groupLayoutBy: null, // for rearrange group nodes after expand/collapse. It's just layout options or whole layout function. Choose your side!
         fisheye: true, // whether to perform fisheye view after expand/collapse you can specify a function too
         animate: true, // whether to animate on drawing changes you can specify a function too
         animationDuration: 1000, // when animate is true, the duration in milliseconds of the animation
