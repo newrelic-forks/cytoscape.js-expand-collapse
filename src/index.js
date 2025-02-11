@@ -526,7 +526,12 @@
       };
 
       // api for cluster operations
-      api.updateCluster = async function (cluster, opts) {
+      // api for cluster operations
+      api.updateCluster = async function (
+        cluster,
+        clusterColorClassesPriorities,
+        opts
+      ) {
         await this.expand(cluster, opts);
         await this.collapse(cluster, opts);
 
@@ -540,10 +545,31 @@
           cy.remove(cluster);
         }
 
+        function updateClusterNodeColor() {
+          var clusterColorClass = clusterColorClassesPriorities?.find(
+            (colorClass) => {
+              return collapsedChildren
+                .filter((child) => child.data("type") === "default")
+                .find((node) => [...node?.classes()].includes(colorClass));
+            }
+          );
+
+          clusterColorClassesPriorities?.length > 0 &&
+            !!clusterColorClass &&
+            cluster.removeClass(clusterColorClassesPriorities);
+          cluster.addClass(clusterColorClass);
+        }
+
         cluster.data("childCount", defaultNodesCount);
+        updateClusterNodeColor();
       };
 
-      api.expandCluster = async function (nodeIds, clusterId, opts) {
+      api.expandCluster = async function (
+        nodeIds,
+        clusterId,
+        clusterColorClassesPriorities,
+        opts
+      ) {
         var cluster = cy.getElementById(clusterId);
 
         var clusterEdge;
@@ -588,10 +614,15 @@
           }
         });
 
-        await this.updateCluster(cluster, opts);
+        await this.updateCluster(cluster, clusterColorClassesPriorities, opts);
       };
 
-      api.collapseCluster = async function (nodeIds, clusterId, opts) {
+      api.collapseCluster = async function (
+        nodeIds,
+        clusterId,
+        clusterColorClassesPriorities,
+        opts
+      ) {
         var cluster = cy.getElementById(clusterId);
 
         nodeIds.forEach((nodeId) => {
@@ -599,7 +630,7 @@
           node.move({ parent: clusterId });
         });
 
-        await this.updateCluster(cluster, opts);
+        await this.updateCluster(cluster, clusterColorClassesPriorities, opts);
       };
 
       return api; // Return the API instance
