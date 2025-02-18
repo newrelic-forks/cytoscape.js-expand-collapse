@@ -145,6 +145,24 @@
         }
       }
 
+      async function supportExpandRecursively(eles) {
+        // Get the support cytoscape instance
+        var supportCy = getSupportCy(cy);
+        supportCy.scratch("_cyExpandCollapse", {
+          ...(cy.scratch("_cyExpandCollapse") ?? {}),
+        });
+
+        supportCy.nodes().forEach((supportNode) => {
+          if (supportNode.data().type === "group") {
+            supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
+            supportNode.toggleClass("collapsed", false);
+            supportNode.toggleClass("expanded", true);
+          }
+        });
+
+        await supportEndOperation(supportCy);
+      }
+
       async function supportExpand(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
@@ -260,11 +278,20 @@
       };
 
       // expand given eles recusively extend options with given param
-      api.expandRecursively = async function (_eles, opts) {
-        var eles = this.expandableNodes(_eles);
+      api.expandRecursively = async function (eles, opts) {
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
+
+        var hasGroupNodes = !!cy
+          .nodes()
+          .some((node) => node.data().type === "group");
+
+        if (hasGroupNodes) {
+          await supportExpandRecursively(eles);
+        }
+
+        setScratch(cy, "tempOptions", tempOptions);
 
         return expandCollapseUtilities.expandAllNodes(eles, tempOptions);
       };
@@ -291,7 +318,13 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        return this.expandRecursively(this.expandableNodes(), tempOptions);
+        var groupNodes = cy.nodes().filter((node) => {
+          return node.data().type === "group";
+        });
+
+        setScratch(cy, "tempOptions", tempOptions);
+
+        return this.expandRecursively(groupNodes, tempOptions);
       };
 
       // Utility functions
