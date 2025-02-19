@@ -138,7 +138,10 @@ function expandCollapseUtilities(cy) {
      * Expands the root and its collapsed descendents in top down order.
      */
     expandAllTopDown: function (root, expandStack, applyFishEyeViewToEachNode) {
-      if (root._private.data.collapsedChildren != null) {
+      if (
+        root._private.data.collapsedChildren != null &&
+        root.data().type !== "cluster"
+      ) {
         expandStack.push(root);
         this.expandNode(root, applyFishEyeViewToEachNode);
       }
