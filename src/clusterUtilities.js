@@ -31,8 +31,8 @@ function repairClusterEdges(cy) {
       }
 
       Object.values(uniqueClusterEdges).forEach((retainedEdge) => {
-        let restoreEdgeData = { ...retainedEdge.data() };
-        let restoreEdgeClasses = [...retainedEdge.classes()];
+        let restoreEdgeData = { ...(retainedEdge?.data?.() ?? {}) };
+        let restoreEdgeClasses = [...(retainedEdge?.classes?.() ?? [])];
         let id = restoreEdgeData.id.split("_");
 
         if (restoreEdgeData.source === clusterId) {

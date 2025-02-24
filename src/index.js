@@ -586,10 +586,13 @@
             }
           );
 
-          clusterColorClassesPriorities?.length > 0 &&
-            !!clusterColorClass &&
+          if (
+            clusterColorClassesPriorities?.length > 0 &&
+            !!clusterColorClass
+          ) {
             cluster.removeClass(clusterColorClassesPriorities);
-          cluster.addClass(clusterColorClass);
+            cluster.addClass(clusterColorClass);
+          }
         }
 
         cluster.data("childCount", defaultNodesCount);
@@ -631,8 +634,8 @@
               }
               var clusterEdge = cy.getElementById(clusterEdgeId.join("_"));
 
-              var nodeEdgeData = { ...clusterEdge?.data() };
-              var nodeEdgeClasses = [...clusterEdge?.classes()];
+              var nodeEdgeData = { ...(clusterEdge?.data?.() ?? {}) };
+              var nodeEdgeClasses = [...(clusterEdge?.classes?.() ?? [])];
               nodeEdgeData.id = edgeId;
               if (nodeEdgeData.source === clusterId) {
                 nodeEdgeData.source = nodeId;
