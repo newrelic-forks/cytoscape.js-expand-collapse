@@ -11,7 +11,6 @@
     var getSupportCy = require("./getSupportCy");
     var { repairClusterEdges } = require("./clusterUtilities");
     var {
-      runLayoutAsync,
       resolveCompoundNodesOverlap,
       getCiseClusterNodesExisitingInMap,
     } = require("./layoutUtilities");
@@ -559,7 +558,6 @@
       };
 
       // api for cluster operations
-      // api for cluster operations
       api.updateCluster = async function (
         cluster,
         clusterColorClassesPriorities,
@@ -576,21 +574,25 @@
           : "0";
         if (String(defaultNodesCount) === "0") {
           cy.remove(cluster);
+          return;
         }
 
         function updateClusterNodeColor() {
           var clusterColorClass = clusterColorClassesPriorities?.find(
             (colorClass) => {
               return collapsedChildren
-                .filter((child) => child.data("type") === "default")
-                .find((node) => [...node?.classes()].includes(colorClass));
+                ?.filter((child) => child.data("type") === "default")
+                ?.find((node) => [...node?.classes()]?.includes(colorClass));
             }
           );
 
-          clusterColorClassesPriorities?.length > 0 &&
-            !!clusterColorClass &&
+          if (
+            clusterColorClassesPriorities?.length > 0 &&
+            !!clusterColorClass
+          ) {
             cluster.removeClass(clusterColorClassesPriorities);
-          cluster.addClass(clusterColorClass);
+            cluster.addClass(clusterColorClass);
+          }
         }
 
         cluster.data("childCount", defaultNodesCount);
@@ -604,16 +606,10 @@
         opts
       ) {
         var cluster = cy.getElementById(clusterId);
-
-        var clusterEdge;
-        cy.edges().forEach((edge) => {
-          if (
-            edge.data("source") === clusterId ||
-            edge.data("target") === clusterId
-          ) {
-            clusterEdge = edge;
-          }
-        });
+        var originalClusteredEdgeids =
+          cy.scratch("_cyExpandCollapse")?.originalClusteredEdgeids?.[
+            clusterId
+          ] ?? new Set();
 
         var collapsedChildren = this.getCollapsedChildren(cluster);
 
@@ -624,27 +620,38 @@
           targetNode.restore();
           targetNode.move({ parent: cluster.data("parent") ?? null });
 
-          if (clusterEdge) {
-            var targetEdgeData = { ...clusterEdge?.data() };
-            var targetEdgeClasses = [...clusterEdge?.classes()];
-            var targetEdgeId = targetEdgeData?.id?.split?.("_");
+          originalClusteredEdgeids.forEach((edgeId) => {
+            var splittedEdgeId = edgeId.split("_");
+            var source = splittedEdgeId[0];
+            var target = splittedEdgeId[splittedEdgeId.length - 1];
 
-            if (targetEdgeData.source === cluster?.data?.()?.id) {
-              targetEdgeId[0] = targetNode.data().id;
-              targetEdgeData.source = targetNode.data().id;
-            } else if (targetEdgeData?.target === cluster?.data?.()?.id) {
-              targetEdgeId[2] = targetNode?.data?.()?.id;
-              targetEdgeData.target = targetNode.data().id;
+            var clusterEdgeId = [...splittedEdgeId];
+            if (source === nodeId || target === nodeId) {
+              if (source === nodeId) {
+                clusterEdgeId[0] = clusterId;
+              } else if (target === nodeId) {
+                clusterEdgeId[clusterEdgeId.length - 1] = clusterId;
+              }
+              var clusterEdge = cy.getElementById(clusterEdgeId.join("_"));
+
+              var nodeEdgeData = { ...(clusterEdge?.data?.() ?? {}) };
+              var nodeEdgeClasses = [...(clusterEdge?.classes?.() ?? [])];
+              nodeEdgeData.id = edgeId;
+              if (nodeEdgeData.source === clusterId) {
+                nodeEdgeData.source = nodeId;
+              } else if (nodeEdgeData.target === clusterId) {
+                nodeEdgeData.target = nodeId;
+              }
+
+              if (!cy.getElementById(edgeId).length) {
+                cy.add({
+                  group: "edges",
+                  data: nodeEdgeData,
+                  classes: nodeEdgeClasses,
+                });
+              }
             }
-            targetEdgeId = targetEdgeId?.join?.("_");
-            targetEdgeData.id = targetEdgeId;
-
-            cy.add({
-              group: "edges",
-              data: targetEdgeData,
-              classes: targetEdgeClasses,
-            });
-          }
+          });
         });
 
         await this.updateCluster(cluster, clusterColorClassesPriorities, opts);
