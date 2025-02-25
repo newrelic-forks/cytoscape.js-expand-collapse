@@ -81,6 +81,10 @@
         // Get the layout options from the scratchpad
         var layoutBy = getScratch(cy, "options").layoutBy;
         var groupLayoutBy = getScratch(cy, "options").groupLayoutBy;
+        var allowUniqueClusterEdges = getScratch(
+          cy,
+          "options"
+        ).allowUniqueClusterEdges;
 
         // clusters of CISE layout
         var ciseClusters = getCiseClusterNodesExisitingInMap(
@@ -88,7 +92,7 @@
           layoutBy?.clusters ?? []
         );
 
-        repairClusterEdges(supportCy);
+        repairClusterEdges(supportCy, allowUniqueClusterEdges);
 
         // Resolve any compound nodes overlap without animation
         await resolveCompoundNodesOverlap(
@@ -605,56 +609,112 @@
         clusterColorClassesPriorities,
         opts
       ) {
-        var cluster = cy.getElementById(clusterId);
-        var originalClusteredEdgeids =
-          cy.scratch("_cyExpandCollapse")?.originalClusteredEdgeids?.[
-            clusterId
-          ] ?? new Set();
+        if (opts?.allowUniqueClusterEdges) {
+          var cluster = cy.getElementById(clusterId);
+          var originalClusteredEdgeids =
+            cy.scratch("_cyExpandCollapse")?.originalClusteredEdgeids?.[
+              clusterId
+            ] ?? new Set();
 
-        var collapsedChildren = this.getCollapsedChildren(cluster);
+          var collapsedChildren = this.getCollapsedChildren(cluster);
 
-        nodeIds.forEach((nodeId) => {
-          var targetNode = collapsedChildren.find(
-            (child) => child.data("id") === nodeId
+          nodeIds.forEach((nodeId) => {
+            var targetNode = collapsedChildren.find(
+              (child) => child.data("id") === nodeId
+            );
+            targetNode.restore();
+            targetNode.move({ parent: cluster.data("parent") ?? null });
+
+            originalClusteredEdgeids.forEach((edgeId) => {
+              var splittedEdgeId = edgeId.split("_");
+              var source = splittedEdgeId[0];
+              var target = splittedEdgeId[splittedEdgeId.length - 1];
+
+              var clusterEdgeId = [...splittedEdgeId];
+              if (source === nodeId || target === nodeId) {
+                if (source === nodeId) {
+                  clusterEdgeId[0] = clusterId;
+                } else if (target === nodeId) {
+                  clusterEdgeId[clusterEdgeId.length - 1] = clusterId;
+                }
+                var clusterEdge = cy.getElementById(clusterEdgeId.join("_"));
+
+                var nodeEdgeData = { ...(clusterEdge?.data?.() ?? {}) };
+                var nodeEdgeClasses = [...(clusterEdge?.classes?.() ?? [])];
+                nodeEdgeData.id = edgeId;
+                if (nodeEdgeData.source === clusterId) {
+                  nodeEdgeData.source = nodeId;
+                } else if (nodeEdgeData.target === clusterId) {
+                  nodeEdgeData.target = nodeId;
+                }
+
+                if (!cy.getElementById(edgeId).length) {
+                  cy.add({
+                    group: "edges",
+                    data: nodeEdgeData,
+                    classes: nodeEdgeClasses,
+                  });
+                }
+              }
+            });
+          });
+
+          await this.updateCluster(
+            cluster,
+            clusterColorClassesPriorities,
+            opts
           );
-          targetNode.restore();
-          targetNode.move({ parent: cluster.data("parent") ?? null });
+        } else {
+          var cluster = cy.getElementById(clusterId);
 
-          originalClusteredEdgeids.forEach((edgeId) => {
-            var splittedEdgeId = edgeId.split("_");
-            var source = splittedEdgeId[0];
-            var target = splittedEdgeId[splittedEdgeId.length - 1];
-
-            var clusterEdgeId = [...splittedEdgeId];
-            if (source === nodeId || target === nodeId) {
-              if (source === nodeId) {
-                clusterEdgeId[0] = clusterId;
-              } else if (target === nodeId) {
-                clusterEdgeId[clusterEdgeId.length - 1] = clusterId;
-              }
-              var clusterEdge = cy.getElementById(clusterEdgeId.join("_"));
-
-              var nodeEdgeData = { ...(clusterEdge?.data?.() ?? {}) };
-              var nodeEdgeClasses = [...(clusterEdge?.classes?.() ?? [])];
-              nodeEdgeData.id = edgeId;
-              if (nodeEdgeData.source === clusterId) {
-                nodeEdgeData.source = nodeId;
-              } else if (nodeEdgeData.target === clusterId) {
-                nodeEdgeData.target = nodeId;
-              }
-
-              if (!cy.getElementById(edgeId).length) {
-                cy.add({
-                  group: "edges",
-                  data: nodeEdgeData,
-                  classes: nodeEdgeClasses,
-                });
-              }
+          var clusterEdge;
+          cy.edges().forEach((edge) => {
+            if (
+              edge.data("source") === clusterId ||
+              edge.data("target") === clusterId
+            ) {
+              clusterEdge = edge;
             }
           });
-        });
 
-        await this.updateCluster(cluster, clusterColorClassesPriorities, opts);
+          var collapsedChildren = this.getCollapsedChildren(cluster);
+
+          nodeIds.forEach((nodeId) => {
+            var targetNode = collapsedChildren.find(
+              (child) => child.data("id") === nodeId
+            );
+            targetNode.restore();
+            targetNode.move({ parent: cluster.data("parent") ?? null });
+
+            if (clusterEdge) {
+              var targetEdgeData = { ...clusterEdge?.data() };
+              var targetEdgeClasses = [...clusterEdge?.classes()];
+              var targetEdgeId = targetEdgeData?.id?.split?.("_");
+
+              if (targetEdgeData.source === cluster?.data?.()?.id) {
+                targetEdgeId[0] = targetNode.data().id;
+                targetEdgeData.source = targetNode.data().id;
+              } else if (targetEdgeData?.target === cluster?.data?.()?.id) {
+                targetEdgeId[2] = targetNode?.data?.()?.id;
+                targetEdgeData.target = targetNode.data().id;
+              }
+              targetEdgeId = targetEdgeId?.join?.("_");
+              targetEdgeData.id = targetEdgeId;
+
+              cy.add({
+                group: "edges",
+                data: targetEdgeData,
+                classes: targetEdgeClasses,
+              });
+            }
+          });
+
+          await this.updateCluster(
+            cluster,
+            clusterColorClassesPriorities,
+            opts
+          );
+        }
       };
 
       api.collapseCluster = async function (
@@ -743,6 +803,7 @@
         allowNestedEdgeCollapse: true,
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
         layoutHandler: function () {}, // layout function to be called after expand/collapse
+        allowUniqueClusterEdges: false,
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension

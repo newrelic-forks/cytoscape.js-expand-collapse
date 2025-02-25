@@ -48,6 +48,8 @@ function elementUtilities(cy) {
       return roots;
     },
     rearrange: async function (layoutBy, layoutHandler) {
+      var allowUniqueClusterEdges =
+        cy?.scratch("_cyExpandCollapse")?.options?.allowUniqueClusterEdges;
       if (layoutBy) {
         var hasGroupsNodes = !!cy
           .nodes()
@@ -60,7 +62,7 @@ function elementUtilities(cy) {
               positions[nodeId] = position;
             }
           );
-          repairClusterEdges(cy);
+          repairClusterEdges(cy, allowUniqueClusterEdges);
 
           // run preset layout with the positions
           await runLayoutAsync(
@@ -75,7 +77,7 @@ function elementUtilities(cy) {
             })
           );
         } else {
-          repairClusterEdges(cy);
+          repairClusterEdges(cy, allowUniqueClusterEdges);
 
           // clusters of CISE layout
           var ciseClusters = getCiseClusterNodesExisitingInMap(
