@@ -107,16 +107,22 @@ function expandCollapseUtilities(cy) {
       var layoutHandler =
         cy.scratch("_cyExpandCollapse")?.tempOptions?.layoutHandler ??
         cy.scratch("_cyExpandCollapse")?.options?.layoutHandler;
+      var allowReArrangeLayout =
+        cy.scratch("_cyExpandCollapse")?.tempOptions?.allowReArrangeLayout ??
+        cy.scratch("_cyExpandCollapse")?.options?.allowReArrangeLayout;
 
-      cy.ready(function () {
-        setTimeout(function () {
-          elementUtilities.rearrange(layoutBy, layoutHandler);
-          if (cy.scratch("_cyExpandCollapse").selectableChanged) {
-            nodes.selectify();
-            cy.scratch("_cyExpandCollapse").selectableChanged = false;
-          }
-        }, 0);
-      });
+      if (allowReArrangeLayout) {
+        cy.ready(function () {
+          setTimeout(function () {
+            elementUtilities.rearrange(layoutBy, layoutHandler);
+            if (cy.scratch("_cyExpandCollapse").selectableChanged) {
+              nodes.selectify();
+              cy.scratch("_cyExpandCollapse").selectableChanged = false;
+            }
+          }, 0);
+        });
+      }
+
       cy.scratch("_cyExpandCollapse").tempOptions.layoutHandler =
         cy.scratch("_cyExpandCollapse")?.options?.layoutHandler;
     },
