@@ -1,4 +1,4 @@
-var { repairClusterEdges } = require("./clusterUtilities");
+var { repairEdges, restoreEdges } = require("./edgeUtilities");
 var {
   runLayoutAsync,
   getCiseClusterNodesExisitingInMap,
@@ -60,7 +60,6 @@ function elementUtilities(cy) {
               positions[nodeId] = position;
             }
           );
-          repairClusterEdges(cy);
 
           // run preset layout with the positions
           await runLayoutAsync(
@@ -75,9 +74,10 @@ function elementUtilities(cy) {
             })
           );
         } else {
-          repairClusterEdges(cy);
-
           // clusters of CISE layout
+
+          repairEdges(cy);
+
           var ciseClusters = getCiseClusterNodesExisitingInMap(
             cy,
             layoutBy?.clusters ?? []
@@ -85,6 +85,8 @@ function elementUtilities(cy) {
           await runLayoutAsync(
             cy.layout({ ...layoutBy, clusters: ciseClusters })
           );
+
+          restoreEdges(cy);
         }
 
         if (layoutHandler) {

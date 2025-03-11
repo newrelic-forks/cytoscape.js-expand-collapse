@@ -9,7 +9,7 @@
     var undoRedoUtilities = require("./undoRedoUtilities");
     var cueUtilities = require("./cueUtilities");
     var getSupportCy = require("./getSupportCy");
-    var { repairClusterEdges } = require("./clusterUtilities");
+    var { repairEdges } = require("./edgeUtilities");
     var {
       resolveCompoundNodesOverlap,
       getCiseClusterNodesExisitingInMap,
@@ -88,7 +88,7 @@
           layoutBy?.clusters ?? []
         );
 
-        repairClusterEdges(supportCy);
+        repairEdges(supportCy);
 
         // Resolve any compound nodes overlap without animation
         await resolveCompoundNodesOverlap(
@@ -561,9 +561,9 @@
       api.updateCluster = async function (
         cluster,
         clusterColorClassesPriorities,
-        opts
+        opts = {}
       ) {
-        await this.expand(cluster, opts);
+        await this.expand(cluster, { ...opts, allowReArrangeLayout: false });
         await this.collapse(cluster, opts);
 
         var collapsedChildren = this.getCollapsedChildren(cluster);
@@ -606,11 +606,6 @@
         opts
       ) {
         var cluster = cy.getElementById(clusterId);
-        var originalClusteredEdgeids =
-          cy.scratch("_cyExpandCollapse")?.originalClusteredEdgeids?.[
-            clusterId
-          ] ?? new Set();
-
         var collapsedChildren = this.getCollapsedChildren(cluster);
 
         nodeIds.forEach((nodeId) => {
@@ -619,39 +614,6 @@
           );
           targetNode.restore();
           targetNode.move({ parent: cluster.data("parent") ?? null });
-
-          originalClusteredEdgeids.forEach((edgeId) => {
-            var splittedEdgeId = edgeId.split("_");
-            var source = splittedEdgeId[0];
-            var target = splittedEdgeId[splittedEdgeId.length - 1];
-
-            var clusterEdgeId = [...splittedEdgeId];
-            if (source === nodeId || target === nodeId) {
-              if (source === nodeId) {
-                clusterEdgeId[0] = clusterId;
-              } else if (target === nodeId) {
-                clusterEdgeId[clusterEdgeId.length - 1] = clusterId;
-              }
-              var clusterEdge = cy.getElementById(clusterEdgeId.join("_"));
-
-              var nodeEdgeData = { ...(clusterEdge?.data?.() ?? {}) };
-              var nodeEdgeClasses = [...(clusterEdge?.classes?.() ?? [])];
-              nodeEdgeData.id = edgeId;
-              if (nodeEdgeData.source === clusterId) {
-                nodeEdgeData.source = nodeId;
-              } else if (nodeEdgeData.target === clusterId) {
-                nodeEdgeData.target = nodeId;
-              }
-
-              if (!cy.getElementById(edgeId).length) {
-                cy.add({
-                  group: "edges",
-                  data: nodeEdgeData,
-                  classes: nodeEdgeClasses,
-                });
-              }
-            }
-          });
         });
 
         await this.updateCluster(cluster, clusterColorClassesPriorities, opts);
@@ -743,6 +705,7 @@
         allowNestedEdgeCollapse: true,
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
         layoutHandler: function () {}, // layout function to be called after expand/collapse
+        allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension
