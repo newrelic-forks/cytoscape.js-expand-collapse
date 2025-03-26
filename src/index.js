@@ -229,13 +229,13 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        var hasGroupNodes = !!cy
-          .nodes()
-          .some((node) => node.data().type === "group");
+        // var hasGroupNodes = !!cy
+        //   .nodes()
+        //   .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
-          await supportCollapse(eles);
-        }
+        // if (hasGroupNodes) {
+        //   await supportCollapse(eles);
+        // }
 
         setScratch(cy, "tempOptions", tempOptions);
 
@@ -263,13 +263,13 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        var hasGroupNodes = !!cy
-          .nodes()
-          .some((node) => node.data().type === "group");
+        // var hasGroupNodes = !!cy
+        //   .nodes()
+        //   .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
-          await supportExpand(eles);
-        }
+        // if (hasGroupNodes) {
+        //   await supportExpand(eles);
+        // }
 
         setScratch(cy, "tempOptions", tempOptions);
 
@@ -282,13 +282,13 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        var hasGroupNodes = !!cy
-          .nodes()
-          .some((node) => node.data().type === "group");
+        // var hasGroupNodes = !!cy
+        //   .nodes()
+        //   .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
-          await supportExpandRecursively(eles);
-        }
+        // if (hasGroupNodes) {
+        //   await supportExpandRecursively(eles);
+        // }
 
         setScratch(cy, "tempOptions", tempOptions);
 
@@ -324,6 +324,21 @@
         setScratch(cy, "tempOptions", tempOptions);
 
         return this.expandRecursively(groupNodes, tempOptions);
+      };
+
+      // custom expand all expandable nodes
+      api.customExpandAll = async function () {
+        var groupNodes = cy.nodes().filter((node) => {
+          return node.data().type === "group";
+        });
+
+        if (groupNodes.length) {
+          await supportExpandRecursively(groupNodes);
+        }
+
+        setScratch(cy, "finalPositions", [
+          ...(cy?.scratch("_cyExpandCollapse")?.positions ?? []),
+        ]);
       };
 
       // Utility functions

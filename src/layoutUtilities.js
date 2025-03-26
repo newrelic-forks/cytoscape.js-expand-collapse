@@ -481,8 +481,134 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy) {
   }
 }
 
+function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
+  const elementUtilities = require("./elementUtilities")(cy);
+  const nodesByGroupLevels = getNodesByGroupLevels(cy);
+
+  for (let i = 0; i < nodesByGroupLevels.length; i++) {
+    for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
+      const nodes = nodesByGroupLevels[i].items[j];
+      // Group the nodes by their original y-coordinate (rows)
+      const rowMap = new Map();
+      nodes.forEach((node) => {
+        const y = node.position("y");
+        if (!rowMap.has(y)) {
+          rowMap.set(y, []);
+        }
+        rowMap.get(y).push(node);
+      });
+
+      // Convert to sorted array of rows
+      const sortedRows = Array.from(rowMap.entries()).sort(
+        (a, b) => a[0] - b[0]
+      );
+
+      // Adjust positioning for each row
+      sortedRows.forEach((currentRowData, rowIndex) => {
+        const currentRowNodes = currentRowData[1];
+
+        // Calculate total width needed for this row
+        const totalWidth = currentRowNodes.reduce((sum, node) => {
+          const nodeWidth =
+            node.data().type !== "group" ? node.width() : node.boundingBox().w;
+          return sum + nodeWidth;
+        }, 0);
+        const totalSeparation = (currentRowNodes.length - 1) * nodeSep;
+
+        // Starting x position to center the row
+        let currentX = -((totalWidth + totalSeparation) / 2);
+
+        // Determine y-position
+        let currentRowY;
+        if (rowIndex === 0) {
+          // For first row, use original y-coordinate
+          currentRowY = currentRowData[0];
+        } else {
+          const prevRowData = sortedRows[rowIndex - 1];
+          const prevRowNodes = prevRowData[1];
+
+          // Calculate max bottom of previous row
+          const maxPrevRowBottom = Math.max(
+            ...prevRowNodes.map(
+              (node) =>
+                (node.data().type !== "group"
+                  ? node.height()
+                  : node.boundingBox().h) / 2
+            )
+          );
+
+          // Calculate max top of current row
+          const maxCurrentRowTop = Math.max(
+            ...currentRowNodes.map(
+              (node) =>
+                (node.data().type !== "group"
+                  ? node.height()
+                  : node.boundingBox().h) / 2
+            )
+          );
+
+          // Calculate current row's new y-position
+          currentRowY =
+            prevRowNodes[0].position("y") +
+            maxPrevRowBottom +
+            rankSep +
+            maxCurrentRowTop;
+        }
+
+        // Position nodes in the current row
+        currentRowNodes.forEach((node) => {
+          const nodeWidth =
+            node.data().type !== "group" ? node.width() : node.boundingBox().w;
+
+          if (
+            !node.hasClass("cy-expand-collapse-collapsed-node") &&
+            node.isParent()
+          ) {
+            const oldPosition = node.position();
+            const newPosition = {
+              x: currentX + nodeWidth / 2,
+              y: currentRowY,
+            };
+            const multiplier = {
+              x: oldPosition.x < newPosition.x ? 1 : -1,
+              y: oldPosition.y < newPosition.y ? 1 : -1,
+            };
+
+            // Calculate the difference in positions, adjusted by the multiplier
+            const positionDiff = {
+              x:
+                multiplier.x === 1
+                  ? newPosition.x - oldPosition.x
+                  : (oldPosition.x - newPosition.x) * -1,
+              y:
+                multiplier.y === 1
+                  ? newPosition.y - oldPosition.y
+                  : (oldPosition.y - newPosition.y) * -1,
+            };
+
+            elementUtilities.moveNodes(
+              positionDiff,
+              node.children(),
+              undefined
+            );
+          } else {
+            node.position({
+              x: currentX + nodeWidth / 2,
+              y: currentRowY,
+            });
+          }
+
+          // Move currentX for next node
+          currentX += nodeWidth + nodeSep;
+        });
+      });
+    }
+  }
+}
+
 module.exports = {
   runLayoutAsync,
   resolveCompoundNodesOverlap,
   getCiseClusterNodesExisitingInMap,
+  adjustDagreLayoutWithSeparation,
 };
