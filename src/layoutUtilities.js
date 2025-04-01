@@ -487,7 +487,11 @@ function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
 
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
-      const nodes = nodesByGroupLevels[i].items[j];
+      const nodes = nodesByGroupLevels[i].items[j].filter(
+        (node) =>
+          cy?.scratch("_cyExpandCollapse")?.options?.layoutBy?.name ===
+            "dagre" || node.data().type === "group"
+      );
       // Group the nodes by their original y-coordinate (rows)
       const rowMap = new Map();
       nodes.forEach((node) => {

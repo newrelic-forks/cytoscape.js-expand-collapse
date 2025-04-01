@@ -55,49 +55,77 @@ function elementUtilities(cy) {
           .nodes()
           .some((node) => node.data().type === "group");
         if (hasGroupsNodes) {
-          var finalPositions = {};
-          (cy?.scratch("_cyExpandCollapse")?.finalPositions ?? []).forEach(
-            ({ nodeId, position }) => {
-              finalPositions[nodeId] = position;
-            }
-          );
+          if (
+            cy?.scratch("_cyExpandCollapse")?.options?.groupLayoutBy?.name !==
+            "dagre"
+          ) {
+            const positions = {};
+            (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+              ({ nodeId, position }) => {
+                positions[nodeId] = position;
+              }
+            );
 
-          var supportCy = getSupportCy(cy);
-          // run preset layout with the finalPositions
-          await runLayoutAsync(
-            supportCy.layout({
-              name: "preset",
-              fit: !!layoutBy?.fit,
-              positions: finalPositions,
-              padding: layoutBy?.padding ?? 50,
-              animate: false,
-            })
-          );
+            // run preset layout with the positions
+            await runLayoutAsync(
+              cy.layout({
+                name: "preset",
+                fit: !!layoutBy?.fit,
+                positions: positions,
+                padding: layoutBy?.padding ?? 50,
+                animate: !!layoutBy?.animate,
+                animationDuration: layoutBy?.animationDuration ?? 500,
+                animationEasing: layoutBy?.animationEasing,
+              })
+            );
+          } else {
+            var finalPositions = {};
+            (cy?.scratch("_cyExpandCollapse")?.finalPositions ?? []).forEach(
+              ({ nodeId, position }) => {
+                finalPositions[nodeId] = position;
+              }
+            );
 
-          adjustDagreLayoutWithSeparation(supportCy, 100, 100);
+            var supportCy = getSupportCy(cy);
+            supportCy.scratch("_cyExpandCollapse", {
+              ...(cy.scratch("_cyExpandCollapse") ?? {}),
+            });
+            // run preset layout with the finalPositions
+            await runLayoutAsync(
+              supportCy.layout({
+                name: "preset",
+                fit: !!layoutBy?.fit,
+                positions: finalPositions,
+                padding: layoutBy?.padding ?? 50,
+                animate: false,
+              })
+            );
 
-          var supportFinalPositions = {};
-          supportCy.nodes().map((node) => {
-            supportFinalPositions[node.id()] = {
-              x: node.position("x"),
-              y: node.position("y"),
-            };
-          });
+            adjustDagreLayoutWithSeparation(supportCy, 100, 100);
 
-          // run preset layout with the supportFinalpositions
-          await runLayoutAsync(
-            cy.layout({
-              name: "preset",
-              fit: !!layoutBy?.fit,
-              positions: supportFinalPositions,
-              padding: layoutBy?.padding ?? 50,
-              animate: !!layoutBy?.animate,
-              animationDuration: layoutBy?.animationDuration ?? 500,
-              animationEasing: layoutBy?.animationEasing,
-            })
-          );
+            var supportFinalPositions = {};
+            supportCy.nodes().map((node) => {
+              supportFinalPositions[node.id()] = {
+                x: node.position("x"),
+                y: node.position("y"),
+              };
+            });
 
-          supportCy.destroy();
+            // run preset layout with the supportFinalpositions
+            await runLayoutAsync(
+              cy.layout({
+                name: "preset",
+                fit: !!layoutBy?.fit,
+                positions: supportFinalPositions,
+                padding: layoutBy?.padding ?? 50,
+                animate: !!layoutBy?.animate,
+                animationDuration: layoutBy?.animationDuration ?? 500,
+                animationEasing: layoutBy?.animationEasing,
+              })
+            );
+
+            supportCy.destroy();
+          }
         } else {
           // clusters of CISE layout
 
