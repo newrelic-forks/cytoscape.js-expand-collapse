@@ -321,24 +321,18 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy) {
   const nodesByGroupLevels = getNodesByGroupLevels(supportCy);
 
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
-    let removedCollection = supportCy.collection();
-    let positioningSupportCollection = supportCy.collection();
-    let groupLevelNodesEdgesCollection = supportCy.collection();
-
-    const groupLevelNodes = [];
-    nodesByGroupLevels[i].items.forEach((group) => {
-      groupLevelNodes.push(...group);
-    });
-
-    const supportExpandedGroupsEdges = getSupportExpandedGroupsEdges(
-      groupLevelNodes,
-      supportCy
-    );
-
     let isAnyNodeGroup = false;
     // Adding support nodes for expanded groups to each group level
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
+      let removedCollection = supportCy.collection();
+      let positioningSupportCollection = supportCy.collection();
+      let groupLevelNodesEdgesCollection = supportCy.collection();
+
       const groupLevelNodesOfAGroup = nodesByGroupLevels[i].items[j];
+      const supportExpandedGroupsEdges = getSupportExpandedGroupsEdges(
+        groupLevelNodesOfAGroup,
+        supportCy
+      );
       const newGroupLevelNodesOfAGroup = groupLevelNodesOfAGroup.map((node) => {
         //check if the node is expanded
         if (node.isNode() && node.data().type === "group") {
@@ -388,96 +382,98 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy) {
       groupLevelNodesEdgesCollection = groupLevelNodesEdgesCollection.union(
         newGroupLevelNodesOfAGroup
       );
-    }
 
-    // Adding edges into collection for support non-expanded nodes
-    const supportNonExpandedGroupsEdges = getSupportNonExpandedGroupsEdges(
-      groupLevelNodesEdgesCollection,
-      supportCy
-    );
-    groupLevelNodesEdgesCollection = groupLevelNodesEdgesCollection.union(
-      supportNonExpandedGroupsEdges
-    );
-
-    // Adding edges into collection for support expanded groups
-    supportExpandedGroupsEdges.forEach(({ id, source, target, label }) => {
-      supportCy.add({
-        group: "edges",
-        data: {
-          id,
-          source,
-          target,
-          label,
-        },
-      });
-      groupLevelNodesEdgesCollection = groupLevelNodesEdgesCollection.union(
-        supportCy.getElementById(id)
+      // Adding edges into collection for support non-expanded nodes
+      const supportNonExpandedGroupsEdges = getSupportNonExpandedGroupsEdges(
+        groupLevelNodesEdgesCollection,
+        supportCy
       );
-    });
+      groupLevelNodesEdgesCollection = groupLevelNodesEdgesCollection.union(
+        supportNonExpandedGroupsEdges
+      );
 
-    // Run the layout with support nodes and edges
-    const layoutOptions = getLayoutOptions(
-      layoutBy,
-      groupLayoutBy,
-      isAnyNodeGroup
-    );
-
-    const reArrange = groupLevelNodesEdgesCollection.layout(layoutOptions);
-    await runLayoutAsync(reArrange);
-
-    // Restore the original nodes
-    removedCollection.restore();
-
-    // Move the children of the removed nodes to their parent positions
-    removedCollection.forEach((removedNode) => {
-      if (
-        removedNode.group() !== "edges" ||
-        removedNode.data()?.type === "default"
-      ) {
-        const positioningSupportNodeId = `support ${removedNode.data().id}`;
-        const positioningSupportNode = supportCy.getElementById(
-          positioningSupportNodeId
+      // Adding edges into collection for support expanded groups
+      supportExpandedGroupsEdges.forEach(({ id, source, target, label }) => {
+        supportCy.add({
+          group: "edges",
+          data: {
+            id,
+            source,
+            target,
+            label,
+          },
+        });
+        groupLevelNodesEdgesCollection = groupLevelNodesEdgesCollection.union(
+          supportCy.getElementById(id)
         );
-        if (positioningSupportNode?.length) {
-          // Determine the multiplier based on the relative positions of removedNode and positioningSupportNode
-          const multiplier = {
-            x:
-              removedNode.position().x < positioningSupportNode.position().x
-                ? 1
-                : -1,
-            y:
-              removedNode.position().y < positioningSupportNode.position().y
-                ? 1
-                : -1,
-          };
+      });
 
-          // Calculate the difference in positions, adjusted by the multiplier
-          const positionDiff = {
-            x:
-              multiplier.x === 1
-                ? positioningSupportNode.position().x - removedNode.position().x
-                : (removedNode.position().x -
-                    positioningSupportNode.position().x) *
-                  -1,
-            y:
-              multiplier.y === 1
-                ? positioningSupportNode.position().y - removedNode.position().y
-                : (removedNode.position().y -
-                    positioningSupportNode.position().y) *
-                  -1,
-          };
+      // Run the layout with support nodes and edges
+      const layoutOptions = getLayoutOptions(
+        layoutBy,
+        groupLayoutBy,
+        isAnyNodeGroup
+      );
 
-          // Move the children of removedNode by the calculated position difference
-          elementUtilities.moveNodes(
-            positionDiff,
-            removedNode.children(),
-            undefined
+      const reArrange = groupLevelNodesEdgesCollection.layout(layoutOptions);
+      await runLayoutAsync(reArrange);
+
+      // Restore the original nodes
+      removedCollection.restore();
+
+      // Move the children of the removed nodes to their parent positions
+      removedCollection.forEach((removedNode) => {
+        if (
+          removedNode.group() !== "edges" ||
+          removedNode.data()?.type === "default"
+        ) {
+          const positioningSupportNodeId = `support ${removedNode.data().id}`;
+          const positioningSupportNode = supportCy.getElementById(
+            positioningSupportNodeId
           );
+          if (positioningSupportNode?.length) {
+            // Determine the multiplier based on the relative positions of removedNode and positioningSupportNode
+            const multiplier = {
+              x:
+                removedNode.position().x < positioningSupportNode.position().x
+                  ? 1
+                  : -1,
+              y:
+                removedNode.position().y < positioningSupportNode.position().y
+                  ? 1
+                  : -1,
+            };
+
+            // Calculate the difference in positions, adjusted by the multiplier
+            const positionDiff = {
+              x:
+                multiplier.x === 1
+                  ? positioningSupportNode.position().x -
+                    removedNode.position().x
+                  : (removedNode.position().x -
+                      positioningSupportNode.position().x) *
+                    -1,
+              y:
+                multiplier.y === 1
+                  ? positioningSupportNode.position().y -
+                    removedNode.position().y
+                  : (removedNode.position().y -
+                      positioningSupportNode.position().y) *
+                    -1,
+            };
+
+            // Move the children of removedNode by the calculated position difference
+            elementUtilities.moveNodes(
+              positionDiff,
+              removedNode.children(),
+              undefined
+            );
+          }
         }
-      }
-    });
-    // remove support nodes
-    positioningSupportCollection.remove();
+      });
+      // remove support nodes
+      positioningSupportCollection.remove();
+    }
   }
 }
 
