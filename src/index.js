@@ -233,7 +233,7 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
+        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
           await supportCollapse(eles);
         }
 
@@ -267,7 +267,7 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
+        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
           await supportExpand(eles);
         }
 
@@ -286,7 +286,7 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
+        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
           await supportExpandRecursively(eles);
         }
 
@@ -324,6 +324,20 @@
         setScratch(cy, "tempOptions", tempOptions);
 
         return this.expandRecursively(groupNodes, tempOptions);
+      };
+
+      api.savePositionsWithAllGroupsExpanded = async function () {
+        var groupNodes = cy.nodes().filter((node) => {
+          return node.data().type === "group";
+        });
+
+        if (groupNodes.length) {
+          await supportExpandRecursively(groupNodes);
+        }
+
+        setScratch(cy, "finalPositions", [
+          ...(cy?.scratch("_cyExpandCollapse")?.positions ?? []),
+        ]);
       };
 
       // Utility functions

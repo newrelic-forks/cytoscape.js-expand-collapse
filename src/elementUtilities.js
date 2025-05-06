@@ -1,7 +1,9 @@
 var { repairEdges, restoreEdges } = require("./edgeUtilities");
+var getSupportCy = require("./getSupportCy");
 var {
   runLayoutAsync,
   getCiseClusterNodesExisitingInMap,
+  adjustDagreLayoutWithSeparation,
 } = require("./layoutUtilities");
 
 function elementUtilities(cy) {
@@ -53,26 +55,77 @@ function elementUtilities(cy) {
           .nodes()
           .some((node) => node.data().type === "group");
         if (hasGroupsNodes) {
-          // get positions of nodes before preset layout
-          const positions = {};
-          (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
-            ({ nodeId, position }) => {
-              positions[nodeId] = position;
-            }
-          );
+          if (
+            cy?.scratch("_cyExpandCollapse")?.options?.groupLayoutBy?.name !==
+            "dagre"
+          ) {
+            const positions = {};
+            (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+              ({ nodeId, position }) => {
+                positions[nodeId] = position;
+              }
+            );
 
-          // run preset layout with the positions
-          await runLayoutAsync(
-            cy.layout({
-              name: "preset",
-              fit: !!layoutBy?.fit,
-              positions: positions,
-              padding: layoutBy?.padding ?? 50,
-              animate: !!layoutBy?.animate,
-              animationDuration: layoutBy?.animationDuration ?? 500,
-              animationEasing: layoutBy?.animationEasing,
-            })
-          );
+            // run preset layout with the positions
+            await runLayoutAsync(
+              cy.layout({
+                name: "preset",
+                fit: !!layoutBy?.fit,
+                positions: positions,
+                padding: layoutBy?.padding ?? 50,
+                animate: !!layoutBy?.animate,
+                animationDuration: layoutBy?.animationDuration ?? 500,
+                animationEasing: layoutBy?.animationEasing,
+              })
+            );
+          } else {
+            var finalPositions = {};
+            (cy?.scratch("_cyExpandCollapse")?.finalPositions ?? []).forEach(
+              ({ nodeId, position }) => {
+                finalPositions[nodeId] = position;
+              }
+            );
+
+            var supportCy = getSupportCy(cy);
+            supportCy.scratch("_cyExpandCollapse", {
+              ...(cy.scratch("_cyExpandCollapse") ?? {}),
+            });
+            // run preset layout with the finalPositions
+            await runLayoutAsync(
+              supportCy.layout({
+                name: "preset",
+                fit: !!layoutBy?.fit,
+                positions: finalPositions,
+                padding: layoutBy?.padding ?? 50,
+                animate: false,
+              })
+            );
+
+            adjustDagreLayoutWithSeparation(supportCy, 100, 100);
+
+            var supportFinalPositions = {};
+            supportCy.nodes().map((node) => {
+              supportFinalPositions[node.id()] = {
+                x: node.position("x"),
+                y: node.position("y"),
+              };
+            });
+
+            // run preset layout with the supportFinalpositions
+            await runLayoutAsync(
+              cy.layout({
+                name: "preset",
+                fit: !!layoutBy?.fit,
+                positions: supportFinalPositions,
+                padding: layoutBy?.padding ?? 50,
+                animate: !!layoutBy?.animate,
+                animationDuration: layoutBy?.animationDuration ?? 500,
+                animationEasing: layoutBy?.animationEasing,
+              })
+            );
+
+            supportCy.destroy();
+          }
         } else {
           // clusters of CISE layout
 
