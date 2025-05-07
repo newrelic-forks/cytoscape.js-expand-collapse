@@ -284,7 +284,7 @@ function getSupportNonExpandedGroupsEdges(groupLevelNodes, cy) {
  * @param {boolean} isAnyNodeGroup - A flag indicating if any node is part of a group.
  * @returns {Object} The computed layout options.
  */
-function getLayoutOptions(layoutBy, groupLayoutBy, isAnyNodeGroup) {
+function getLayoutOptions(layoutBy, groupLayoutBy, isAnyNodeGroup, groupLevel) {
   let layoutOptions;
   if (groupLayoutBy && isAnyNodeGroup) {
     layoutOptions = {
@@ -305,7 +305,7 @@ function getLayoutOptions(layoutBy, groupLayoutBy, isAnyNodeGroup) {
       rows: layoutBy?.rows,
     };
   }
-  return layoutOptions;
+  return { ...layoutOptions, rankDir: groupLevel === 3 ? "LR" : "TB" };
 }
 
 /**
@@ -412,7 +412,8 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy) {
       const layoutOptions = getLayoutOptions(
         layoutBy,
         groupLayoutBy,
-        isAnyNodeGroup
+        isAnyNodeGroup,
+        nodesByGroupLevels[i].level
       );
 
       const reArrange = groupLevelNodesEdgesCollection.layout(layoutOptions);
