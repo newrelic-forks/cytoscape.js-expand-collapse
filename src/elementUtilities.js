@@ -79,18 +79,16 @@ function elementUtilities(cy) {
               })
             );
           } else {
-            var finalPositions = {};
-            (cy?.scratch("_cyExpandCollapse")?.finalPositions ?? []).forEach(
-              ({ nodeId, position }) => {
-                finalPositions[nodeId] = position;
-              }
-            );
+            var finalPositions =
+              cy?.scratch("_cyExpandCollapse")?.finalPositions ?? {};
 
+            //run support map preset layout with the position of all nodes when all groups are expanded
             var supportCy = getSupportCy(cy);
+            var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
             supportCy.scratch("_cyExpandCollapse", {
-              ...(cy.scratch("_cyExpandCollapse") ?? {}),
+              ...scratchPad,
+              parentData: { ...(scratchPad?.parentData ?? {}) },
             });
-            // run preset layout with the finalPositions
             await runLayoutAsync(
               supportCy.layout({
                 name: "preset",
@@ -101,8 +99,10 @@ function elementUtilities(cy) {
               })
             );
 
+            // adjust seperation between nodes in support map since few group nodes might be collapsed
             adjustDagreLayoutWithSeparation(supportCy, 100, 100);
 
+            // store support map nodes final positions
             var supportFinalPositions = {};
             supportCy.nodes().map((node) => {
               supportFinalPositions[node.id()] = {
@@ -111,7 +111,7 @@ function elementUtilities(cy) {
               };
             });
 
-            // run preset layout with the supportFinalpositions
+            // run preset layout with the supportFinalpositions on main map
             await runLayoutAsync(
               cy.layout({
                 name: "preset",
@@ -126,6 +126,13 @@ function elementUtilities(cy) {
 
             supportCy.destroy();
           }
+          cy.nodes().forEach((node) => {
+            if (node.data().type === "group" && node.isParent()) {
+              node.toggleClass("after-expand", true);
+            } else if (node.data().type === "group" && !node.isParent()) {
+              node.toggleClass("after-expand", false);
+            }
+          });
         } else {
           // clusters of CISE layout
 
