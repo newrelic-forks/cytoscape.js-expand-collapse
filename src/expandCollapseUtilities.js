@@ -102,7 +102,7 @@ function expandCollapseUtilities(cy) {
     /*
      * The operation to be performed after expand/collapse. It rearrange nodes by layoutBy parameter.
      */
-    endOperation: function (layoutBy, nodes) {
+    endOperation: async function (layoutBy, nodes) {
       var self = this;
       var layoutHandler =
         cy.scratch("_cyExpandCollapse")?.tempOptions?.layoutHandler ??
@@ -112,6 +112,9 @@ function expandCollapseUtilities(cy) {
         cy.scratch("_cyExpandCollapse")?.options?.allowReArrangeLayout;
 
       if (allowReArrangeLayout) {
+        await cy
+          ?.scratch("_cyExpandCollapse")
+          ?.api?.savePositionsWithAllGroupsExpanded?.();
         cy.ready(function () {
           setTimeout(function () {
             elementUtilities.rearrange(layoutBy, layoutHandler);

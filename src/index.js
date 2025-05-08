@@ -77,6 +77,14 @@
         return true;
       }
 
+      function removeAfterExpandClass() {
+        cy.nodes().forEach((node) => {
+          if (node.data().type === "group") {
+            node.toggleClass("after-expand", false);
+          }
+        });
+      }
+
       async function supportEndOperation(supportCy) {
         // Get the layout options from the scratchpad
         var layoutBy = getScratch(cy, "options").layoutBy;
@@ -116,8 +124,10 @@
       async function supportCollapse(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
+        var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
         supportCy.scratch("_cyExpandCollapse", {
-          ...(cy.scratch("_cyExpandCollapse") ?? {}),
+          ...scratchPad,
+          parentData: { ...(scratchPad?.parentData ?? {}) },
         });
 
         // Get the support nodes corresponding to the elements to be collapsed
@@ -147,17 +157,31 @@
       async function supportExpandRecursively(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
+        var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
         supportCy.scratch("_cyExpandCollapse", {
-          ...(cy.scratch("_cyExpandCollapse") ?? {}),
+          ...scratchPad,
+          parentData: { ...(scratchPad?.parentData ?? {}) },
         });
+
+        var supportGroupNodesCollection = supportCy.collection();
 
         supportCy.nodes().forEach((supportNode) => {
           if (supportNode.data().type === "group") {
             supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
             supportNode.toggleClass("collapsed", false);
             supportNode.toggleClass("expanded", true);
+            supportGroupNodesCollection =
+              supportGroupNodesCollection.union(supportNode);
           }
         });
+
+        var supportExpandCollapseUtilities =
+          require("./expandCollapseUtilities")(supportCy);
+
+        await supportExpandCollapseUtilities.simpleExpandAllNodes(
+          undefined,
+          false
+        );
 
         await supportEndOperation(supportCy);
       }
@@ -165,8 +189,10 @@
       async function supportExpand(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
+        var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
         supportCy.scratch("_cyExpandCollapse", {
-          ...(cy.scratch("_cyExpandCollapse") ?? {}),
+          ...scratchPad,
+          parentData: { ...(scratchPad?.parentData ?? {}) },
         });
 
         // Get the support nodes corresponding to the elements to be collapsed
@@ -233,13 +259,21 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
-          await supportCollapse(eles);
+        if (hasGroupNodes) {
+          removeAfterExpandClass();
+          if (tempOptions?.groupLayoutBy?.name !== "dagre") {
+            await supportCollapse(eles);
+          }
         }
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return expandCollapseUtilities.collapseGivenNodes(eles, tempOptions);
+        const result = expandCollapseUtilities.collapseGivenNodes(
+          eles,
+          tempOptions
+        );
+
+        return result;
       };
 
       // collapse given eles recursively extend options with given param
@@ -267,8 +301,11 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
-          await supportExpand(eles);
+        if (hasGroupNodes) {
+          removeAfterExpandClass();
+          if (tempOptions?.groupLayoutBy?.name !== "dagre") {
+            await supportExpand(eles);
+          }
         }
 
         setScratch(cy, "tempOptions", tempOptions);
@@ -286,8 +323,11 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
-          await supportExpandRecursively(eles);
+        if (hasGroupNodes) {
+          removeAfterExpandClass();
+          if (tempOptions?.groupLayoutBy?.name !== "dagre") {
+            await supportExpandRecursively(eles);
+          }
         }
 
         setScratch(cy, "tempOptions", tempOptions);
@@ -335,9 +375,16 @@
           await supportExpandRecursively(groupNodes);
         }
 
-        setScratch(cy, "finalPositions", [
-          ...(cy?.scratch("_cyExpandCollapse")?.positions ?? []),
-        ]);
+        var finalPositions = {};
+        (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+          ({ nodeId, position }) => {
+            finalPositions[nodeId] = position;
+          }
+        );
+
+        setScratch(cy, "finalPositions", finalPositions);
+
+        return finalPositions;
       };
 
       // Utility functions
