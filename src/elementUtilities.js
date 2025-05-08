@@ -126,6 +126,8 @@ function elementUtilities(cy) {
 
             supportCy.destroy();
           }
+
+          // toggle the expanded group node classes, since in-place group node expansion is difficult with new primitive styles (i.e, bounds-expansion, including node labels etc.)
           cy.nodes().forEach((node) => {
             if (node.data().type === "group" && node.isParent()) {
               node.toggleClass("after-expand", true);
