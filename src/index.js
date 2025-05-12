@@ -81,7 +81,7 @@
         // Get the layout options from the scratchpad
         var layoutBy = getScratch(cy, "options").layoutBy;
         var groupLayoutBy = getScratch(cy, "options").groupLayoutBy;
-
+        var customLayout = getScratch(cy, "options").customLayout;
         // clusters of CISE layout
         var ciseClusters = getCiseClusterNodesExisitingInMap(
           supportCy,
@@ -98,7 +98,8 @@
             clusters: ciseClusters,
             animate: false,
           },
-          { ...groupLayoutBy, clusters: ciseClusters, animate: false }
+          { ...groupLayoutBy, clusters: ciseClusters, animate: false },
+          customLayout
         );
 
         var positions = supportCy.nodes().map((node) => ({
@@ -720,6 +721,7 @@
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
         layoutHandler: function () {}, // layout function to be called after expand/collapse
         allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
+        customLayout: false, // whether to use custom layout
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension
