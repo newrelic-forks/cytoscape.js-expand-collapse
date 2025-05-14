@@ -111,15 +111,20 @@ function expandCollapseUtilities(cy) {
         cy.scratch("_cyExpandCollapse")?.tempOptions?.allowReArrangeLayout ??
         cy.scratch("_cyExpandCollapse")?.options?.allowReArrangeLayout;
 
+      async function handleReArrangeLayout() {
+        await new Promise((resolve) => {
+          elementUtilities.rearrange(layoutBy, layoutHandler);
+          if (cy.scratch("_cyExpandCollapse").selectableChanged) {
+            nodes.selectify();
+            cy.scratch("_cyExpandCollapse").selectableChanged = false;
+          }
+          resolve();
+        });
+      }
+
       if (allowReArrangeLayout) {
-        cy.ready(function () {
-          setTimeout(function () {
-            elementUtilities.rearrange(layoutBy, layoutHandler);
-            if (cy.scratch("_cyExpandCollapse").selectableChanged) {
-              nodes.selectify();
-              cy.scratch("_cyExpandCollapse").selectableChanged = false;
-            }
-          }, 0);
+        cy.ready(async function () {
+          await handleReArrangeLayout();
         });
       }
 

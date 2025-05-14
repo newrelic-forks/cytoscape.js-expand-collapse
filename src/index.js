@@ -587,7 +587,7 @@
             ).length
           : "0";
         if (String(defaultNodesCount) === "0") {
-          cy.remove(cluster);
+          cluster.hide()
           return;
         }
 
@@ -640,7 +640,7 @@
         opts
       ) {
         var cluster = cy.getElementById(clusterId);
-
+        if(cluster.hidden()) cluster.show()
         nodeIds.forEach((nodeId) => {
           var node = cy.getElementById(nodeId);
           node.move({ parent: clusterId });
