@@ -77,14 +77,6 @@
         return true;
       }
 
-      function removeAfterExpandClass() {
-        cy.nodes().forEach((node) => {
-          if (node.data().type === "group") {
-            node.toggleClass("after-expand", false);
-          }
-        });
-      }
-
       async function supportEndOperation(supportCy) {
         // Get the layout options from the scratchpad
         var layoutBy = getScratch(cy, "options").layoutBy;
@@ -97,6 +89,19 @@
         );
 
         repairEdges(supportCy);
+
+        supportCy.nodes().forEach((node) => {
+          if (node.data("type") === "group" && node.isParent()) {
+            node.style({
+              "compound-sizing-wrt-labels": "exclude",
+              "background-clip": "node",
+              "background-offset-y": "0px",
+              "background-image-containment": "inside",
+              label: "",
+              "bounds-expansion": [0, 0, 0, 0],
+            });
+          }
+        });
 
         // Resolve any compound nodes overlap without animation
         await resolveCompoundNodesOverlap(
@@ -124,11 +129,6 @@
       async function supportCollapse(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
-        var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
-        supportCy.scratch("_cyExpandCollapse", {
-          ...scratchPad,
-          parentData: { ...(scratchPad?.parentData ?? {}) },
-        });
 
         // Get the support nodes corresponding to the elements to be collapsed
         var supportNodes = eles.map((ele) => {
@@ -146,7 +146,7 @@
 
           var supportExpandCollapseUtilities =
             require("./expandCollapseUtilities")(supportCy);
-          supportExpandCollapseUtilities.simpleCollapseGivenNodes(
+          await supportExpandCollapseUtilities.simpleCollapseGivenNodes(
             collapseNodesCollection
           );
 
@@ -157,11 +157,6 @@
       async function supportExpandRecursively(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
-        var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
-        supportCy.scratch("_cyExpandCollapse", {
-          ...scratchPad,
-          parentData: { ...(scratchPad?.parentData ?? {}) },
-        });
 
         var supportGroupNodesCollection = supportCy.collection();
 
@@ -189,11 +184,6 @@
       async function supportExpand(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
-        var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
-        supportCy.scratch("_cyExpandCollapse", {
-          ...scratchPad,
-          parentData: { ...(scratchPad?.parentData ?? {}) },
-        });
 
         // Get the support nodes corresponding to the elements to be collapsed
         var supportNodes = eles.map((ele) => {
@@ -212,7 +202,7 @@
           var supportExpandCollapseUtilities =
             require("./expandCollapseUtilities")(supportCy);
 
-          supportExpandCollapseUtilities.simpleExpandGivenNodes(
+          await supportExpandCollapseUtilities.simpleExpandGivenNodes(
             expandNodesCollection,
             false
           );
@@ -260,7 +250,6 @@
           .some((node) => node.data().type === "group");
 
         if (hasGroupNodes) {
-          removeAfterExpandClass();
           if (tempOptions?.groupLayoutBy?.name !== "dagre") {
             await supportCollapse(eles);
           }
@@ -268,7 +257,7 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        const result = expandCollapseUtilities.collapseGivenNodes(
+        const result = await expandCollapseUtilities.collapseGivenNodes(
           eles,
           tempOptions
         );
@@ -302,7 +291,6 @@
           .some((node) => node.data().type === "group");
 
         if (hasGroupNodes) {
-          removeAfterExpandClass();
           if (tempOptions?.groupLayoutBy?.name !== "dagre") {
             await supportExpand(eles);
           }
@@ -310,7 +298,12 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return expandCollapseUtilities.expandGivenNodes(eles, tempOptions);
+        const result = await expandCollapseUtilities.expandGivenNodes(
+          eles,
+          tempOptions
+        );
+
+        return result;
       };
 
       // expand given eles recusively extend options with given param
@@ -324,7 +317,6 @@
           .some((node) => node.data().type === "group");
 
         if (hasGroupNodes) {
-          removeAfterExpandClass();
           if (tempOptions?.groupLayoutBy?.name !== "dagre") {
             await supportExpandRecursively(eles);
           }
@@ -332,7 +324,12 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return expandCollapseUtilities.expandAllNodes(eles, tempOptions);
+        const result = await expandCollapseUtilities.expandAllNodes(
+          eles,
+          tempOptions
+        );
+
+        return result;
       };
 
       // Core functions
@@ -352,7 +349,7 @@
       };
 
       // expand all expandable nodes
-      api.expandAll = function (opts) {
+      api.expandAll = async function (opts) {
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
@@ -363,7 +360,9 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return this.expandRecursively(groupNodes, tempOptions);
+        const result = await this.expandRecursively(groupNodes, tempOptions);
+
+        return result;
       };
 
       api.savePositionsWithAllGroupsExpanded = async function () {
@@ -373,18 +372,17 @@
 
         if (groupNodes.length) {
           await supportExpandRecursively(groupNodes);
+          var finalPositions = {};
+          (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+            ({ nodeId, position }) => {
+              finalPositions[nodeId] = position;
+            }
+          );
+
+          setScratch(cy, "finalPositions", finalPositions);
+
+          return finalPositions;
         }
-
-        var finalPositions = {};
-        (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
-          ({ nodeId, position }) => {
-            finalPositions[nodeId] = position;
-          }
-        );
-
-        setScratch(cy, "finalPositions", finalPositions);
-
-        return finalPositions;
       };
 
       // Utility functions
@@ -624,7 +622,10 @@
         clusterColorClassesPriorities,
         opts = {}
       ) {
-        await this.expand(cluster, { ...opts, allowReArrangeLayout: false });
+        await this.expand(cluster, {
+          ...opts,
+          allowReArrangeLayout: false,
+        });
         await this.collapse(cluster, opts);
 
         var collapsedChildren = this.getCollapsedChildren(cluster);
@@ -634,8 +635,10 @@
             ).length
           : "0";
         if (String(defaultNodesCount) === "0") {
-          cy.remove(cluster);
+          cluster.style({ display: "none" });
           return;
+        } else {
+          cluster.style({ display: "element" });
         }
 
         function updateClusterNodeColor() {
@@ -767,6 +770,7 @@
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
         layoutHandler: function () {}, // layout function to be called after expand/collapse
         allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
+        shouldSaveFinalPositions: false, // whether to save final positions of all nodes; when all groups are expanded
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension

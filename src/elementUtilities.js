@@ -54,6 +54,7 @@ function elementUtilities(cy) {
         var hasGroupsNodes = !!cy
           .nodes()
           .some((node) => node.data().type === "group");
+
         if (hasGroupsNodes) {
           if (
             cy?.scratch("_cyExpandCollapse")?.options?.groupLayoutBy?.name !==
@@ -84,11 +85,6 @@ function elementUtilities(cy) {
 
             //run support map preset layout with the position of all nodes when all groups are expanded
             var supportCy = getSupportCy(cy);
-            var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
-            supportCy.scratch("_cyExpandCollapse", {
-              ...scratchPad,
-              parentData: { ...(scratchPad?.parentData ?? {}) },
-            });
             await runLayoutAsync(
               supportCy.layout({
                 name: "preset",
@@ -126,29 +122,44 @@ function elementUtilities(cy) {
 
             supportCy.destroy();
           }
-
-          // toggle the expanded group node classes, since in-place group node expansion is difficult with new primitive styles (i.e, bounds-expansion, including node labels etc.)
-          cy.nodes().forEach((node) => {
-            if (node.data().type === "group" && node.isParent()) {
-              node.toggleClass("after-expand", true);
-            } else if (node.data().type === "group" && !node.isParent()) {
-              node.toggleClass("after-expand", false);
-            }
-          });
         } else {
           // clusters of CISE layout
 
-          repairEdges(cy);
+          var supportCy = getSupportCy(cy);
+
+          repairEdges(supportCy);
 
           var ciseClusters = getCiseClusterNodesExisitingInMap(
-            cy,
+            supportCy,
             layoutBy?.clusters ?? []
           );
           await runLayoutAsync(
-            cy.layout({ ...layoutBy, clusters: ciseClusters })
+            supportCy.layout({ ...layoutBy, clusters: ciseClusters })
           );
 
-          restoreEdges(cy);
+          // store support map nodes final positions
+          var supportFinalPositions = {};
+          supportCy.nodes().map((node) => {
+            supportFinalPositions[node.id()] = {
+              x: node.position("x"),
+              y: node.position("y"),
+            };
+          });
+
+          // run preset layout with the supportFinalpositions on main map
+          await runLayoutAsync(
+            cy.layout({
+              name: "preset",
+              fit: !!layoutBy?.fit,
+              positions: supportFinalPositions,
+              padding: layoutBy?.padding ?? 50,
+              animate: !!layoutBy?.animate,
+              animationDuration: layoutBy?.animationDuration ?? 500,
+              animationEasing: layoutBy?.animationEasing,
+            })
+          );
+
+          supportCy.destroy();
         }
 
         if (layoutHandler) {

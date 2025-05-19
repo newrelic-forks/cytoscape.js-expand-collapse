@@ -481,13 +481,25 @@ function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
   const elementUtilities = require("./elementUtilities")(cy);
   const nodesByGroupLevels = getNodesByGroupLevels(cy);
 
+  cy.nodes().forEach((node) => {
+    if (node.data("type") === "group" && node.isParent()) {
+      node.style({
+        "compound-sizing-wrt-labels": "exclude",
+        "background-clip": "node",
+        "background-offset-y": "0px",
+        "background-image-containment": "inside",
+        label: "",
+        "bounds-expansion": [0, 0, 0, 0],
+        padding: 44,
+      });
+    }
+  });
+
+  const rowMaps = [];
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
+    rowMaps[i] = []; // Initialize the inner array for each level
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
-      const nodes = nodesByGroupLevels[i].items[j].filter(
-        (node) =>
-          cy?.scratch("_cyExpandCollapse")?.options?.layoutBy?.name ===
-            "dagre" || node.data().type === "group"
-      );
+      const nodes = nodesByGroupLevels[i].items[j];
       // Group the nodes by their original y-coordinate (rows)
       const rowMap = new Map();
       nodes.forEach((node) => {
@@ -497,6 +509,14 @@ function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
         }
         rowMap.get(y).push(node);
       });
+      rowMaps[i][j] = rowMap;
+    }
+  }
+
+  for (let i = 0; i < nodesByGroupLevels.length; i++) {
+    for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
+      // Group the nodes by their original y-coordinate (rows)
+      const rowMap = rowMaps[i][j];
 
       // Convert to sorted array of rows
       const sortedRows = Array.from(rowMap.entries()).sort(
