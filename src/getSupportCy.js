@@ -37,6 +37,20 @@ function getSupportCy(cy) {
     style: supportCyStyle,
   });
 
+  var scratchPad = cy.scratch("_cyExpandCollapse") ?? {};
+  supportCy.scratch("_cyExpandCollapse", {
+    ...scratchPad,
+    parentData: { ...(scratchPad?.parentData ?? {}) },
+    options: {
+      ...(scratchPad?.options ?? {}),
+      allowReArrangeLayout: false,
+    },
+    tempOptions: {
+      ...(scratchPad?.tempOptions ?? {}),
+      allowReArrangeLayout: false,
+    },
+  });
+
   return supportCy;
 }
 
