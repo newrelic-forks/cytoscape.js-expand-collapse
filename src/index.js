@@ -90,6 +90,12 @@
 
         repairEdges(supportCy);
 
+        supportCy.nodes().forEach((node) => {
+          if (node.data("type") === "group" && node.isParent()) {
+            node.toggleClass("support-expanded", true);
+          }
+        });
+
         // Resolve any compound nodes overlap without animation
         await resolveCompoundNodesOverlap(
           supportCy,
@@ -116,9 +122,6 @@
       async function supportCollapse(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
-        supportCy.scratch("_cyExpandCollapse", {
-          ...(cy.scratch("_cyExpandCollapse") ?? {}),
-        });
 
         // Get the support nodes corresponding to the elements to be collapsed
         var supportNodes = eles.map((ele) => {
@@ -136,7 +139,7 @@
 
           var supportExpandCollapseUtilities =
             require("./expandCollapseUtilities")(supportCy);
-          supportExpandCollapseUtilities.simpleCollapseGivenNodes(
+          await supportExpandCollapseUtilities.simpleCollapseGivenNodes(
             collapseNodesCollection
           );
 
@@ -147,17 +150,26 @@
       async function supportExpandRecursively(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
-        supportCy.scratch("_cyExpandCollapse", {
-          ...(cy.scratch("_cyExpandCollapse") ?? {}),
-        });
+
+        var supportGroupNodesCollection = supportCy.collection();
 
         supportCy.nodes().forEach((supportNode) => {
           if (supportNode.data().type === "group") {
             supportNode.toggleClass("cy-expand-collapse-collapsed-node", false);
             supportNode.toggleClass("collapsed", false);
             supportNode.toggleClass("expanded", true);
+            supportGroupNodesCollection =
+              supportGroupNodesCollection.union(supportNode);
           }
         });
+
+        var supportExpandCollapseUtilities =
+          require("./expandCollapseUtilities")(supportCy);
+
+        await supportExpandCollapseUtilities.simpleExpandAllNodes(
+          undefined,
+          false
+        );
 
         await supportEndOperation(supportCy);
       }
@@ -165,9 +177,6 @@
       async function supportExpand(eles) {
         // Get the support cytoscape instance
         var supportCy = getSupportCy(cy);
-        supportCy.scratch("_cyExpandCollapse", {
-          ...(cy.scratch("_cyExpandCollapse") ?? {}),
-        });
 
         // Get the support nodes corresponding to the elements to be collapsed
         var supportNodes = eles.map((ele) => {
@@ -186,7 +195,7 @@
           var supportExpandCollapseUtilities =
             require("./expandCollapseUtilities")(supportCy);
 
-          supportExpandCollapseUtilities.simpleExpandGivenNodes(
+          await supportExpandCollapseUtilities.simpleExpandGivenNodes(
             expandNodesCollection,
             false
           );
@@ -239,7 +248,12 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return expandCollapseUtilities.collapseGivenNodes(eles, tempOptions);
+        const result = await expandCollapseUtilities.collapseGivenNodes(
+          eles,
+          tempOptions
+        );
+
+        return result;
       };
 
       // collapse given eles recursively extend options with given param
@@ -273,7 +287,12 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return expandCollapseUtilities.expandGivenNodes(eles, tempOptions);
+        const result = await expandCollapseUtilities.expandGivenNodes(
+          eles,
+          tempOptions
+        );
+
+        return result;
       };
 
       // expand given eles recusively extend options with given param
@@ -292,7 +311,12 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return expandCollapseUtilities.expandAllNodes(eles, tempOptions);
+        const result = await expandCollapseUtilities.expandAllNodes(
+          eles,
+          tempOptions
+        );
+
+        return result;
       };
 
       // Core functions
@@ -312,7 +336,7 @@
       };
 
       // expand all expandable nodes
-      api.expandAll = function (opts) {
+      api.expandAll = async function (opts) {
         var options = getScratch(cy, "options");
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
@@ -323,7 +347,9 @@
 
         setScratch(cy, "tempOptions", tempOptions);
 
-        return this.expandRecursively(groupNodes, tempOptions);
+        const result = await this.expandRecursively(groupNodes, tempOptions);
+
+        return result;
       };
 
       api.savePositionsWithAllGroupsExpanded = async function () {
@@ -333,11 +359,17 @@
 
         if (groupNodes.length) {
           await supportExpandRecursively(groupNodes);
-        }
+          var finalPositions = {};
+          (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
+            ({ nodeId, position }) => {
+              finalPositions[nodeId] = position;
+            }
+          );
 
-        setScratch(cy, "finalPositions", [
-          ...(cy?.scratch("_cyExpandCollapse")?.positions ?? []),
-        ]);
+          setScratch(cy, "finalPositions", finalPositions);
+
+          return finalPositions;
+        }
       };
 
       // Utility functions
@@ -577,7 +609,10 @@
         clusterColorClassesPriorities,
         opts = {}
       ) {
-        await this.expand(cluster, { ...opts, allowReArrangeLayout: false });
+        await this.expand(cluster, {
+          ...opts,
+          allowReArrangeLayout: false,
+        });
         await this.collapse(cluster, opts);
 
         var collapsedChildren = this.getCollapsedChildren(cluster);
@@ -587,8 +622,10 @@
             ).length
           : "0";
         if (String(defaultNodesCount) === "0") {
-          cy.remove(cluster);
+          cluster.style({ display: "none" });
           return;
+        } else {
+          cluster.style({ display: "element" });
         }
 
         function updateClusterNodeColor() {
@@ -720,6 +757,7 @@
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
         layoutHandler: function () {}, // layout function to be called after expand/collapse
         allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
+        shouldSaveFinalPositions: false, // whether to save final positions of all nodes; when all groups are expanded
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension

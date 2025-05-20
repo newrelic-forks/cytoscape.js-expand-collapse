@@ -11,7 +11,7 @@ function expandCollapseUtilities(cy) {
      * Single parameter indicates if the node is expanded alone and if it is truthy then layoutBy parameter is considered to
      * perform layout after expand.
      */
-    expandNodeBaseFunction: function (node, single, layoutBy) {
+    expandNodeBaseFunction: async function (node, single, layoutBy) {
       if (!node._private.data.collapsedChildren) {
         return;
       }
@@ -27,6 +27,10 @@ function expandCollapseUtilities(cy) {
       };
 
       node.removeData("infoLabel");
+      if (node.data("type") === "group") {
+        node.toggleClass("expanded", true);
+        node.toggleClass("collapsed", false);
+      }
       node.removeClass("cy-expand-collapse-collapsed-node");
 
       node.trigger("expandcollapse.beforeexpand");
@@ -50,7 +54,7 @@ function expandCollapseUtilities(cy) {
 
       // If expand is called just for one node then call end operation to perform layout
       if (single) {
-        this.endOperation(layoutBy, node);
+        await this.endOperation(layoutBy, node);
       }
     },
     /*
@@ -61,6 +65,7 @@ function expandCollapseUtilities(cy) {
       //*//
       nodes.data("collapse", true);
       var roots = elementUtilities.getTopMostNodes(nodes);
+
       for (var i = 0; i < roots.length; i++) {
         var root = roots[i];
 
@@ -74,19 +79,19 @@ function expandCollapseUtilities(cy) {
      * A helper function to expand given nodes in a simple way (Without performing layout afterward)
      * It expands all top most nodes top down.
      */
-    simpleExpandGivenNodes: function (nodes, applyFishEyeViewToEachNode) {
+    simpleExpandGivenNodes: async function (nodes, applyFishEyeViewToEachNode) {
       nodes.data("expand", true); // Mark that the nodes are still to be expanded
       var roots = elementUtilities.getTopMostNodes(nodes);
       for (var i = 0; i < roots.length; i++) {
         var root = roots[i];
-        this.expandTopDown(root, applyFishEyeViewToEachNode); // For each root node expand top down
+        await this.expandTopDown(root, applyFishEyeViewToEachNode); // MODIFIED: await // For each root node expand top down
       }
       return nodes;
     },
     /*
      * Expands all nodes by expanding all top most nodes top down with their descendants.
      */
-    simpleExpandAllNodes: function (nodes, applyFishEyeViewToEachNode) {
+    simpleExpandAllNodes: async function (nodes, applyFishEyeViewToEachNode) {
       if (nodes === undefined) {
         nodes = cy.nodes();
       }
@@ -95,32 +100,42 @@ function expandCollapseUtilities(cy) {
       var expandStack = [];
       for (var i = 0; i < orphans.length; i++) {
         var root = orphans[i];
-        this.expandAllTopDown(root, expandStack, applyFishEyeViewToEachNode);
+        await this.expandAllTopDown(
+          root,
+          expandStack,
+          applyFishEyeViewToEachNode
+        );
       }
       return expandStack;
     },
     /*
      * The operation to be performed after expand/collapse. It rearrange nodes by layoutBy parameter.
      */
-    endOperation: function (layoutBy, nodes) {
-      var self = this;
+    endOperation: async function (layoutBy, nodes) {
       var layoutHandler =
         cy.scratch("_cyExpandCollapse")?.tempOptions?.layoutHandler ??
         cy.scratch("_cyExpandCollapse")?.options?.layoutHandler;
       var allowReArrangeLayout =
         cy.scratch("_cyExpandCollapse")?.tempOptions?.allowReArrangeLayout ??
         cy.scratch("_cyExpandCollapse")?.options?.allowReArrangeLayout;
+      var shouldSaveFinalPositions =
+        cy.scratch("_cyExpandCollapse")?.tempOptions
+          ?.shouldSaveFinalPositions ??
+        cy.scratch("_cyExpandCollapse")?.options?.shouldSaveFinalPositions;
 
       if (allowReArrangeLayout) {
-        cy.ready(function () {
-          setTimeout(function () {
-            elementUtilities.rearrange(layoutBy, layoutHandler);
-            if (cy.scratch("_cyExpandCollapse").selectableChanged) {
-              nodes.selectify();
-              cy.scratch("_cyExpandCollapse").selectableChanged = false;
-            }
-          }, 0);
-        });
+        if (shouldSaveFinalPositions) {
+          await cy
+            ?.scratch("_cyExpandCollapse")
+            ?.api?.savePositionsWithAllGroupsExpanded?.();
+        }
+
+        await elementUtilities.rearrange(layoutBy, layoutHandler);
+
+        if (cy.scratch("_cyExpandCollapse").selectableChanged) {
+          nodes.selectify();
+          cy.scratch("_cyExpandCollapse").selectableChanged = false;
+        }
       }
 
       cy.scratch("_cyExpandCollapse").tempOptions.layoutHandler =
@@ -129,11 +144,13 @@ function expandCollapseUtilities(cy) {
     /*
      * Calls simple expandAllNodes. Then performs end operation.
      */
-    expandAllNodes: function (nodes, options) {
-      //*//
-      var expandedStack = this.simpleExpandAllNodes(nodes, options?.fisheye);
+    expandAllNodes: async function (nodes, options) {
+      var expandedStack = await this.simpleExpandAllNodes(
+        nodes,
+        options?.fisheye
+      );
 
-      this.endOperation(options?.layoutBy, nodes);
+      await this.endOperation(options?.layoutBy, nodes);
 
       /*
        * return the nodes to undo the operation
@@ -143,28 +160,36 @@ function expandCollapseUtilities(cy) {
     /*
      * Expands the root and its collapsed descendents in top down order.
      */
-    expandAllTopDown: function (root, expandStack, applyFishEyeViewToEachNode) {
+    expandAllTopDown: async function (
+      root,
+      expandStack,
+      applyFishEyeViewToEachNode
+    ) {
       if (
         root._private.data.collapsedChildren != null &&
         root.data().type !== "cluster"
       ) {
         expandStack.push(root);
-        this.expandNode(root, applyFishEyeViewToEachNode);
+        await this.expandNode(root, applyFishEyeViewToEachNode);
       }
       var children = root.children();
       for (var i = 0; i < children.length; i++) {
         var node = children[i];
-        this.expandAllTopDown(node, expandStack, applyFishEyeViewToEachNode);
+        await this.expandAllTopDown(
+          node,
+          expandStack,
+          applyFishEyeViewToEachNode
+        );
       }
     },
     //Expand the given nodes perform end operation after expandation
-    expandGivenNodes: function (nodes, options) {
+    expandGivenNodes: async function (nodes, options) {
       // If there is just one node to expand we need to animate for fisheye view, but if there are more then one node we do not
       if (nodes.length === 1) {
         var node = nodes[0];
         if (node._private.data.collapsedChildren != null) {
           // Expand the given node the third parameter indicates that the node is simple which ensures that fisheye parameter will be considered
-          this.expandNode(
+          await this.expandNode(
             node,
             options?.fisheye,
             true,
@@ -175,8 +200,8 @@ function expandCollapseUtilities(cy) {
         }
       } else {
         // First expand given nodes and then perform layout according to the layoutBy parameter
-        this.simpleExpandGivenNodes(nodes, options?.fisheye);
-        this.endOperation(options?.layoutBy, nodes);
+        await this.simpleExpandGivenNodes(nodes, options?.fisheye);
+        await this.endOperation(options?.layoutBy, nodes);
       }
 
       /*
@@ -185,7 +210,7 @@ function expandCollapseUtilities(cy) {
       return nodes;
     },
     //collapse the given nodes then perform end operation
-    collapseGivenNodes: function (nodes, options) {
+    collapseGivenNodes: async function (nodes, options) {
       /*
        * In collapse operation there is no fisheye view to be applied so there is no animation to be destroyed here. We can do this
        * in a batch.
@@ -195,7 +220,7 @@ function expandCollapseUtilities(cy) {
       cy.endBatch();
 
       nodes.trigger("position"); // position not triggered by default when collapseNode is called
-      this.endOperation(options?.layoutBy, nodes);
+      await this.endOperation(options?.layoutBy, nodes);
 
       // Update the style
       cy.style().update();
@@ -219,17 +244,17 @@ function expandCollapseUtilities(cy) {
       }
     },
     //expand the nodes in top down order starting from the root
-    expandTopDown: function (root, applyFishEyeViewToEachNode) {
+    expandTopDown: async function (root, applyFishEyeViewToEachNode) {
       if (root.data("expand") && root._private.data.collapsedChildren != null) {
         // Expand the root and unmark its expand data to specify that it is no more to be expanded
-        this.expandNode(root, applyFishEyeViewToEachNode);
+        await this.expandNode(root, applyFishEyeViewToEachNode);
         root.removeData("expand");
       }
       // Make a recursive call for children of root
       var children = root.children();
       for (var i = 0; i < children.length; i++) {
         var node = children[i];
-        this.expandTopDown(node);
+        await this.expandTopDown(node, applyFishEyeViewToEachNode);
       }
     },
     // Converst the rendered position to model position according to global pan and zoom values
@@ -251,7 +276,7 @@ function expandCollapseUtilities(cy) {
      * applyFishEyeView parameter then the state of view port is to be changed to have extra space on the screen (if needed) before appliying the
      * fisheye view.
      */
-    expandNode: function (
+    expandNode: async function (
       node,
       applyFishEyeView,
       single,
@@ -261,37 +286,34 @@ function expandCollapseUtilities(cy) {
     ) {
       var self = this;
 
-      var commonExpandOperation = function (
-        node,
-        applyFishEyeView,
-        single,
-        animate,
-        layoutBy,
-        animationDuration
+      var commonExpandOperation = async function (
+        opNode,
+        opApplyFishEyeView,
+        opSingle,
+        opAnimate,
+        opLayoutBy,
+        opAnimationDuration
       ) {
-        if (applyFishEyeView) {
-          node._private.data["width-before-fisheye"] =
-            node._private.data["size-before-collapse"].w;
-          node._private.data["height-before-fisheye"] =
-            node._private.data["size-before-collapse"].h;
+        if (opApplyFishEyeView) {
+          opNode._private.data["width-before-fisheye"] =
+            opNode._private.data["size-before-collapse"].w;
+          opNode._private.data["height-before-fisheye"] =
+            opNode._private.data["size-before-collapse"].h;
 
-          // Fisheye view expand the node.
-          // The first paramter indicates the node to apply fisheye view, the third parameter indicates the node
-          // to be expanded after fisheye view is applied.
-          self.fishEyeViewExpandGivenNode(
-            node,
-            single,
-            node,
-            animate,
-            layoutBy,
-            animationDuration
+          await self.fishEyeViewExpandGivenNode(
+            opNode,
+            opSingle,
+            opNode,
+            opAnimate,
+            opLayoutBy,
+            opAnimationDuration
           );
         }
 
         // If one of these parameters is truthy it means that expandNodeBaseFunction is already to be called.
         // However if none of them is truthy we need to call it here.
-        if (!single || !applyFishEyeView || !animate) {
-          self.expandNodeBaseFunction(node, single, layoutBy);
+        if (!opSingle || !opApplyFishEyeView || !opAnimate) {
+          await self.expandNodeBaseFunction(opNode, opSingle, opLayoutBy);
         }
       };
 
@@ -343,25 +365,28 @@ function expandCollapseUtilities(cy) {
             animating = animate; // Signal that there is an animation now and commonExpandOperation will be called after animation
             // Check if we need to animate during pan and zoom
             if (animate) {
-              cy.animate(
-                {
-                  pan: viewPort.pan,
-                  zoom: viewPort.zoom,
-                  complete: function () {
-                    commonExpandOperation(
-                      node,
-                      applyFishEyeView,
-                      single,
-                      animate,
-                      layoutBy,
-                      animationDuration
-                    );
+              // If viewport change should be animated
+              await cy
+                .animate(
+                  {
+                    pan: viewPort.pan,
+                    zoom: viewPort.zoom,
+                    complete: function () {
+                      commonExpandOperation(
+                        node,
+                        applyFishEyeView,
+                        single,
+                        animate,
+                        layoutBy,
+                        animationDuration
+                      );
+                    },
                   },
-                },
-                {
-                  duration: animationDuration || 1000,
-                }
-              );
+                  {
+                    duration: animationDuration || 1000,
+                  }
+                )
+                .promise();
             } else {
               cy.zoom(viewPort.zoom);
               cy.pan(viewPort.pan);
@@ -407,6 +432,10 @@ function expandCollapseUtilities(cy) {
 
         this.barrowEdgesOfcollapsedChildren(node);
         this.removeChildren(node, node);
+        if (node.data("type") === "group") {
+          node.toggleClass("expanded", false);
+          node.toggleClass("collapsed", true);
+        }
         node.addClass("cy-expand-collapse-collapsed-node");
 
         node.trigger("expandcollapse.aftercollapse");
@@ -434,7 +463,7 @@ function expandCollapseUtilities(cy) {
      * Apply fisheye view to the given node. nodeToExpand will be expanded after the operation.
      * The other parameter are to be passed by parameters directly in internal function calls.
      */
-    fishEyeViewExpandGivenNode: function (
+    fishEyeViewExpandGivenNode: async function (
       node,
       single,
       nodeToExpand,
@@ -544,7 +573,7 @@ function expandCollapseUtilities(cy) {
         }
 
         // Move the sibling in the special way
-        this.fishEyeViewMoveNode(
+        await this.fishEyeViewMoveNode(
           sibling,
           T_x,
           T_y,
@@ -558,12 +587,12 @@ function expandCollapseUtilities(cy) {
 
       // If there is no sibling call expand node base function here else it is to be called one of fishEyeViewMoveNode() calls
       if (siblings.length == 0 && node.same(nodeToExpand)) {
-        this.expandNodeBaseFunction(nodeToExpand, single, layoutBy);
+        await this.expandNodeBaseFunction(nodeToExpand, single, layoutBy);
       }
 
       if (node.parent()[0] != null) {
         // Apply fisheye view to the parent node as well ( If exists )
-        this.fishEyeViewExpandGivenNode(
+        await this.fishEyeViewExpandGivenNode(
           node.parent()[0],
           single,
           nodeToExpand,
@@ -591,7 +620,7 @@ function expandCollapseUtilities(cy) {
      * Move node operation specialized for fish eye view expand operation
      * Moves the node by moving its descandents. Movement is animated if both single and animate flags are truthy.
      */
-    fishEyeViewMoveNode: function (
+    fishEyeViewMoveNode: async function (
       node,
       T_x,
       T_y,
@@ -619,30 +648,32 @@ function expandCollapseUtilities(cy) {
           node.position(newPosition); // at this point, position should be updated
         } else {
           this.animatedlyMovingNodeCount++;
-          node.animate(
-            {
-              position: newPosition,
-              complete: function () {
-                self.animatedlyMovingNodeCount--;
-                if (
-                  self.animatedlyMovingNodeCount > 0 ||
-                  !nodeToExpand.hasClass("cy-expand-collapse-collapsed-node")
-                ) {
-                  return;
-                }
-
-                // If all nodes are moved we are ready to expand so call expand node base function
-                self.expandNodeBaseFunction(nodeToExpand, single, layoutBy);
+          await node
+            .animate(
+              {
+                position: newPosition,
               },
-            },
-            {
-              duration: animationDuration || 1000,
-            }
-          );
+              {
+                duration: animationDuration || 1000,
+              }
+            )
+            .promise()
+            .then(async () => {
+              self.animatedlyMovingNodeCount--;
+              if (
+                self.animatedlyMovingNodeCount > 0 ||
+                !nodeToExpand.hasClass("cy-expand-collapse-collapsed-node")
+              ) {
+                return;
+              }
+
+              // If all nodes are moved we are ready to expand so call expand node base function
+              await self.expandNodeBaseFunction(nodeToExpand, single, layoutBy);
+            });
         }
       } else {
         for (var i = 0; i < childrenList.length; i++) {
-          this.fishEyeViewMoveNode(
+          await this.fishEyeViewMoveNode(
             childrenList[i],
             T_x,
             T_y,
@@ -774,13 +805,6 @@ function expandCollapseUtilities(cy) {
         var edge = connectedMetaEdges[i];
         var originalEnds = edge.data("originalEnds");
         var currentSrcId = edge.data("source");
-        var currentTgtId = edge.data("target");
-        var originalEndsSource = cy.getElementById(
-          originalEnds?.source?.id?.()
-        );
-        var originalEndsTarget = cy.getElementById(
-          originalEnds?.target?.id?.()
-        );
 
         if (currentSrcId === node.id()) {
           if (originalEnds?.source) {
