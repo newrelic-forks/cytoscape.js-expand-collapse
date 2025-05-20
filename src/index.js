@@ -92,14 +92,7 @@
 
         supportCy.nodes().forEach((node) => {
           if (node.data("type") === "group" && node.isParent()) {
-            node.style({
-              "compound-sizing-wrt-labels": "exclude",
-              "background-clip": "node",
-              "background-offset-y": "0px",
-              "background-image-containment": "inside",
-              label: "",
-              "bounds-expansion": [0, 0, 0, 0],
-            });
+            node.toggleClass("support-expanded", true);
           }
         });
 
@@ -249,10 +242,8 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
-          if (tempOptions?.groupLayoutBy?.name !== "dagre") {
-            await supportCollapse(eles);
-          }
+        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
+          await supportCollapse(eles);
         }
 
         setScratch(cy, "tempOptions", tempOptions);
@@ -290,10 +281,8 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
-          if (tempOptions?.groupLayoutBy?.name !== "dagre") {
-            await supportExpand(eles);
-          }
+        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
+          await supportExpand(eles);
         }
 
         setScratch(cy, "tempOptions", tempOptions);
@@ -316,10 +305,8 @@
           .nodes()
           .some((node) => node.data().type === "group");
 
-        if (hasGroupNodes) {
-          if (tempOptions?.groupLayoutBy?.name !== "dagre") {
-            await supportExpandRecursively(eles);
-          }
+        if (hasGroupNodes && tempOptions?.groupLayoutBy?.name !== "dagre") {
+          await supportExpandRecursively(eles);
         }
 
         setScratch(cy, "tempOptions", tempOptions);

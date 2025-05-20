@@ -483,15 +483,7 @@ function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
 
   cy.nodes().forEach((node) => {
     if (node.data("type") === "group" && node.isParent()) {
-      node.style({
-        "compound-sizing-wrt-labels": "exclude",
-        "background-clip": "node",
-        "background-offset-y": "0px",
-        "background-image-containment": "inside",
-        label: "",
-        "bounds-expansion": [0, 0, 0, 0],
-        padding: 44,
-      });
+      node.toggleClass("support-expanded", true);
     }
   });
 
