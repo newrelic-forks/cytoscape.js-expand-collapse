@@ -8,10 +8,9 @@ function expandCollapseUtilities(cy) {
     animatedlyMovingNodeCount: 0,
     /*
      * A funtion basicly expanding a node, it is to be called when a node is expanded anyway.
-     * Single parameter indicates if the node is expanded alone and if it is truthy then layoutBy parameter is considered to
-     * perform layout after expand.
+     * Single parameter indicates if the node is expanded alone and if it is truthy then to perform layout after expand.
      */
-    expandNodeBaseFunction: async function (node, single, layoutBy) {
+    expandNodeBaseFunction: async function (node, single) {
       if (!node._private.data.collapsedChildren) {
         return;
       }
@@ -54,7 +53,7 @@ function expandCollapseUtilities(cy) {
 
       // If expand is called just for one node then call end operation to perform layout
       if (single) {
-        await this.endOperation(layoutBy, node);
+        await this.endOperation(node);
       }
     },
     /*
@@ -109,28 +108,23 @@ function expandCollapseUtilities(cy) {
       return expandStack;
     },
     /*
-     * The operation to be performed after expand/collapse. It rearrange nodes by layoutBy parameter.
+     * The operation to be performed after expand/collapse. It rearrange nodes.
      */
-    endOperation: async function (layoutBy, nodes) {
-      var layoutHandler =
-        cy.scratch("_cyExpandCollapse")?.tempOptions?.layoutHandler ??
-        cy.scratch("_cyExpandCollapse")?.options?.layoutHandler;
+    endOperation: async function (nodes) {
       var allowReArrangeLayout =
-        cy.scratch("_cyExpandCollapse")?.tempOptions?.allowReArrangeLayout ??
-        cy.scratch("_cyExpandCollapse")?.options?.allowReArrangeLayout;
+        cy.scratch("_cyExpandCollapse")?.tempOptions?.allowReArrangeLayout;
       var shouldSaveFinalPositions =
-        cy.scratch("_cyExpandCollapse")?.tempOptions
-          ?.shouldSaveFinalPositions ??
-        cy.scratch("_cyExpandCollapse")?.options?.shouldSaveFinalPositions;
+        cy.scratch("_cyExpandCollapse")?.tempOptions?.shouldSaveFinalPositions;
+      var savePositionsWithAllGroupsExpanded =
+        cy?.scratch("_cyExpandCollapse")?.api
+          ?.savePositionsWithAllGroupsExpanded;
 
       if (allowReArrangeLayout) {
         if (shouldSaveFinalPositions) {
-          await cy
-            ?.scratch("_cyExpandCollapse")
-            ?.api?.savePositionsWithAllGroupsExpanded?.();
+          await savePositionsWithAllGroupsExpanded?.();
         }
 
-        await elementUtilities.rearrange(layoutBy, layoutHandler);
+        await elementUtilities.rearrange();
 
         if (cy.scratch("_cyExpandCollapse").selectableChanged) {
           nodes.selectify();
@@ -150,7 +144,7 @@ function expandCollapseUtilities(cy) {
         options?.fisheye
       );
 
-      await this.endOperation(options?.layoutBy, nodes);
+      await this.endOperation(nodes);
 
       /*
        * return the nodes to undo the operation
@@ -194,14 +188,13 @@ function expandCollapseUtilities(cy) {
             options?.fisheye,
             true,
             options?.animate,
-            options?.layoutBy,
             options?.animationDuration
           );
         }
       } else {
-        // First expand given nodes and then perform layout according to the layoutBy parameter
+        // First expand given nodes and then perform layout
         await this.simpleExpandGivenNodes(nodes, options?.fisheye);
-        await this.endOperation(options?.layoutBy, nodes);
+        await this.endOperation(nodes);
       }
 
       /*
@@ -220,7 +213,7 @@ function expandCollapseUtilities(cy) {
       cy.endBatch();
 
       nodes.trigger("position"); // position not triggered by default when collapseNode is called
-      await this.endOperation(options?.layoutBy, nodes);
+      await this.endOperation(nodes);
 
       // Update the style
       cy.style().update();
@@ -271,7 +264,7 @@ function expandCollapseUtilities(cy) {
       };
     },
     /*
-     * This method expands the given node. It considers applyFishEyeView, animate and layoutBy parameters.
+     * This method expands the given node. It considers applyFishEyeView, animate.
      * It also considers single parameter which indicates if this node is expanded alone. If this parameter is truthy along with
      * applyFishEyeView parameter then the state of view port is to be changed to have extra space on the screen (if needed) before appliying the
      * fisheye view.
@@ -281,7 +274,6 @@ function expandCollapseUtilities(cy) {
       applyFishEyeView,
       single,
       animate,
-      layoutBy,
       animationDuration
     ) {
       var self = this;
@@ -291,7 +283,6 @@ function expandCollapseUtilities(cy) {
         opApplyFishEyeView,
         opSingle,
         opAnimate,
-        opLayoutBy,
         opAnimationDuration
       ) {
         if (opApplyFishEyeView) {
@@ -305,7 +296,6 @@ function expandCollapseUtilities(cy) {
             opSingle,
             opNode,
             opAnimate,
-            opLayoutBy,
             opAnimationDuration
           );
         }
@@ -313,7 +303,7 @@ function expandCollapseUtilities(cy) {
         // If one of these parameters is truthy it means that expandNodeBaseFunction is already to be called.
         // However if none of them is truthy we need to call it here.
         if (!opSingle || !opApplyFishEyeView || !opAnimate) {
-          await self.expandNodeBaseFunction(opNode, opSingle, opLayoutBy);
+          await self.expandNodeBaseFunction(opNode, opSingle);
         }
       };
 
@@ -377,7 +367,6 @@ function expandCollapseUtilities(cy) {
                         applyFishEyeView,
                         single,
                         animate,
-                        layoutBy,
                         animationDuration
                       );
                     },
@@ -401,7 +390,6 @@ function expandCollapseUtilities(cy) {
             applyFishEyeView,
             single,
             animate,
-            layoutBy,
             animationDuration
           );
         }
@@ -468,7 +456,6 @@ function expandCollapseUtilities(cy) {
       single,
       nodeToExpand,
       animate,
-      layoutBy,
       animationDuration
     ) {
       var siblings = this.getSiblings(node);
@@ -580,14 +567,13 @@ function expandCollapseUtilities(cy) {
           nodeToExpand,
           single,
           animate,
-          layoutBy,
           animationDuration
         );
       }
 
       // If there is no sibling call expand node base function here else it is to be called one of fishEyeViewMoveNode() calls
       if (siblings.length == 0 && node.same(nodeToExpand)) {
-        await this.expandNodeBaseFunction(nodeToExpand, single, layoutBy);
+        await this.expandNodeBaseFunction(nodeToExpand, single);
       }
 
       if (node.parent()[0] != null) {
@@ -597,7 +583,6 @@ function expandCollapseUtilities(cy) {
           single,
           nodeToExpand,
           animate,
-          layoutBy,
           animationDuration
         );
       }
@@ -627,7 +612,6 @@ function expandCollapseUtilities(cy) {
       nodeToExpand,
       single,
       animate,
-      layoutBy,
       animationDuration
     ) {
       var childrenList = cy.collection();
@@ -668,7 +652,7 @@ function expandCollapseUtilities(cy) {
               }
 
               // If all nodes are moved we are ready to expand so call expand node base function
-              await self.expandNodeBaseFunction(nodeToExpand, single, layoutBy);
+              await self.expandNodeBaseFunction(nodeToExpand, single);
             });
         }
       } else {
@@ -680,7 +664,6 @@ function expandCollapseUtilities(cy) {
             nodeToExpand,
             single,
             animate,
-            layoutBy,
             animationDuration
           );
         }

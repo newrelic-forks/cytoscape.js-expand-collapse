@@ -1,27 +1,5 @@
-/**
- * Filters out nodes from ciseClusters that do not exist in the given Cytoscape instance.
- *
- * @param {Object} cy - The Cytoscape instance.
- * @param {Array} ciseClusters - An array of clusters, where each cluster is an array of node IDs.
- * @returns {Array} An array of updated clusters, containing only the node IDs that exist in the Cytoscape instance.
- */
-function getCiseClusterNodesExisitingInMap(cy, ciseClusters) {
-  const updatedClusters = [];
-  ciseClusters.forEach((cluster) => {
-    const updatedCluster = [];
-
-    cluster.forEach((nodeId) => {
-      if (cy.getElementById(nodeId).length) {
-        updatedCluster.push(nodeId);
-      }
-    });
-
-    if (updatedCluster.length) {
-      updatedClusters.push(updatedCluster);
-    }
-  });
-  return updatedClusters;
-}
+const getSupportCy = require("./getSupportCy");
+const { repairEdges } = require("./edgeUtilities");
 
 /**
  * Runs the given layout asynchronously and returns a promise that resolves when the layout stops.
@@ -34,6 +12,160 @@ function runLayoutAsync(layout) {
     layout.on("layoutstop", resolve);
     layout.run();
   });
+}
+
+/**
+ * Generates layout options based on the provided parameters.
+ *
+ * @param {Object} layoutBy - The default layout configuration.
+ * @param {Object} groupLayoutBy - The layout configuration for group nodes.
+ * @param {boolean} isAnyNodeGroup - A flag indicating if any node is part of a group.
+ * @returns {Object} The computed layout options.
+ */
+function getLayoutOptions(
+  layoutBy,
+  groupLayoutBy,
+  isAnyNodeGroup,
+  groupLevel,
+  customLayout
+) {
+  let layoutOptions;
+  if (groupLayoutBy && isAnyNodeGroup) {
+    layoutOptions = {
+      ...groupLayoutBy,
+      cols: groupLayoutBy?.compoundCols ?? groupLayoutBy?.cols,
+      rows: groupLayoutBy?.compoundRows ?? groupLayoutBy?.rows,
+    };
+  } else if (isAnyNodeGroup) {
+    layoutOptions = {
+      ...layoutBy,
+      cols: layoutBy?.compoundCols ?? layoutBy?.cols,
+      rows: layoutBy?.compoundRows ?? layoutBy?.rows,
+    };
+  } else {
+    layoutOptions = {
+      ...layoutBy,
+      cols: layoutBy?.cols,
+      rows: layoutBy?.rows,
+    };
+  }
+  return {
+    ...layoutOptions,
+    rankDir: customLayout && groupLevel === 3 ? "LR" : "TB",
+    nodeSep: customLayout && groupLevel === 3 ? 10 : layoutOptions.nodeSep,
+    rankSep: customLayout && groupLevel === 3 ? 10 : layoutOptions.rankSep,
+  };
+}
+
+/**
+ * Creates a configuration object for a preset layout.
+ *
+ * @param {object} layoutBy - The base layout configuration.
+ * @param {object} positions - The positions to apply to the nodes.
+ * @returns {object} The complete preset layout configuration.
+ */
+function createPresetLayoutConfig(layoutBy, positions) {
+  return {
+    name: "preset",
+    fit: !!layoutBy?.fit,
+    positions,
+    padding: layoutBy?.padding ?? 50,
+    animate: !!layoutBy?.animate,
+    animationDuration: layoutBy?.animationDuration ?? 500,
+    animationEasing: layoutBy?.animationEasing,
+  };
+}
+
+/**
+ * Extracts node positions from a Cytoscape instance.
+ *
+ * @param {object} cy - The Cytoscape instance to extract positions from.
+ * @returns {object} An object mapping node IDs to their positions.
+ */
+function getPositionsFromCy(cy) {
+  const positions = {};
+  cy.nodes().forEach((node) => {
+    positions[node.id()] = node.position();
+  });
+  return positions;
+}
+
+/**
+ * Handles the layout for a graph with no group nodes.
+ *
+ * @param {object} cy - The Cytoscape instance.
+ * @param {object} expandCollapseOptions - The expand/collapse extension options.
+ */
+async function handleLayoutWithoutGroups(cy, expandCollapseOptions) {
+  const supportCy = getSupportCy(cy);
+  repairEdges(supportCy);
+  await runLayoutAsync(supportCy.layout(expandCollapseOptions.layoutBy));
+
+  const finalPositions = getPositionsFromCy(supportCy);
+  const presetLayout = createPresetLayoutConfig(
+    expandCollapseOptions.layoutBy,
+    finalPositions
+  );
+  await runLayoutAsync(cy.layout(presetLayout));
+  supportCy.destroy();
+}
+
+/**
+ * Handles the layout for group nodes using a preset layout.
+ *
+ * @param {object} cy - The Cytoscape instance.
+ * @param {object} expandCollapseOptions - The expand/collapse extension options.
+ */
+async function handleNonDagreLayoutWithGroups(cy, expandCollapseOptions) {
+  const positions = (expandCollapseOptions?.positions ?? []).reduce(
+    (acc, { nodeId, position }) => {
+      acc[nodeId] = position;
+      return acc;
+    },
+    {}
+  );
+
+  const presetLayout = createPresetLayoutConfig(
+    expandCollapseOptions.groupLayoutBy,
+    positions
+  );
+  await runLayoutAsync(cy.layout(presetLayout));
+}
+
+/**
+ * Handles the layout for group nodes using a dagre layout.
+ *
+ * @param {object} cy - The Cytoscape instance.
+ */
+async function handleDagreLayoutWithGroups(cy) {
+  const finalPositions = cy.scratch("_cyExpandCollapse")?.finalPositions ?? {};
+  const supportCy = getSupportCy(cy);
+  const elementUtilities = require("./elementUtilities")(supportCy);
+  const nodesByGroupLevels = getNodesByGroupLevels(supportCy);
+
+  nodesByGroupLevels.forEach((level) => {
+    level.items.forEach((nodes) => {
+      nodes.forEach((node) => {
+        const newPosition = finalPositions[node.id()];
+        if (node.data("type") === "group" && node.isParent()) {
+          node.toggleClass("support-expanded", true);
+          const oldPosition = node.position();
+          elementUtilities.moveCompoundNode(node, oldPosition, newPosition);
+        } else {
+          node.position(newPosition);
+        }
+      });
+    });
+  });
+  adjustDagreLayoutWithSeparation(supportCy);
+
+  const supportFinalPositions = getPositionsFromCy(supportCy);
+  const presetLayout = createPresetLayoutConfig(
+    cy.scratch("_cyExpandCollapse").tempOptions.groupLayoutBy,
+    supportFinalPositions
+  );
+  await runLayoutAsync(cy.layout(presetLayout));
+  supportCy.destroy();
 }
 
 /**
@@ -110,7 +242,7 @@ function getNodesByGroupLevels(cy) {
 function getEdgeIdWithPrefix(id, parentId, cy, prefix = "support") {
   const edgeId = getEdgeOutermostId(id, parentId, cy);
   const node = cy.getElementById(edgeId);
-  if (!node.hasClass("cy-expand-collapse-collapsed-node") && node.isParent()) {
+  if (node.data("type") === "group" && node.isParent()) {
     return `${prefix} ${edgeId}`;
   }
   return edgeId;
@@ -148,10 +280,7 @@ function getInnerMostChildNodes(id, cy) {
   let nonExpandedChildNodes = cy.collection();
 
   childNodes.forEach((childNode) => {
-    if (
-      !childNode.hasClass("cy-expand-collapse-collapsed-node") &&
-      childNode.isParent()
-    ) {
+    if (childNode.data("type") === "group" && childNode.isParent()) {
       nonExpandedChildNodes = nonExpandedChildNodes.union(
         getInnerMostChildNodes(childNode.id(), cy)
       );
@@ -171,10 +300,7 @@ function getInnerMostChildNodes(id, cy) {
  */
 function getSupportExpandedGroupsEdges(groupLevelNodes, cy) {
   const expandedGroupNodes = groupLevelNodes.filter((node) => {
-    if (
-      !node.hasClass("cy-expand-collapse-collapsed-node") &&
-      node.isParent()
-    ) {
+    if (node.data("type") === "group" && node.isParent()) {
       return node;
     }
   });
@@ -277,41 +403,6 @@ function getSupportNonExpandedGroupsEdges(groupLevelNodes, cy) {
 }
 
 /**
- * Generates layout options based on the provided parameters.
- *
- * @param {Object} layoutBy - The default layout configuration.
- * @param {Object} groupLayoutBy - The layout configuration for group nodes.
- * @param {boolean} isAnyNodeGroup - A flag indicating if any node is part of a group.
- * @returns {Object} The computed layout options.
- */
-function getLayoutOptions(layoutBy, groupLayoutBy, isAnyNodeGroup, groupLevel, customLayout) {
-  let layoutOptions;
-  if (groupLayoutBy && isAnyNodeGroup) {
-    layoutOptions = {
-      ...groupLayoutBy,
-      cols: groupLayoutBy?.compoundCols ?? groupLayoutBy?.cols,
-      rows: groupLayoutBy?.compoundRows ?? groupLayoutBy?.rows,
-    };
-  } else if (isAnyNodeGroup) {
-    layoutOptions = {
-      ...layoutBy,
-      cols: layoutBy?.compoundCols ?? layoutBy?.cols,
-      rows: layoutBy?.compoundRows ?? layoutBy?.rows,
-    };
-  } else {
-    layoutOptions = {
-      ...layoutBy,
-      cols: layoutBy?.cols,
-      rows: layoutBy?.rows,
-    };
-  }
-  return { 
-    ...layoutOptions, 
-    rankDir: customLayout && groupLevel === 3 ? "LR" : "TB" 
-  };
-}
-
-/**
  * Resolves overlap of compound nodes in a cytoscape instance by temporarily replacing expanded nodes with positioning support nodes,
  * running the specified layout, and then restoring the original nodes.
  *
@@ -319,7 +410,12 @@ function getLayoutOptions(layoutBy, groupLayoutBy, isAnyNodeGroup, groupLevel, c
  * @param {Object} layoutBy - The layout options to be used for arranging the nodes.
  * @returns {Promise<void>} A promise that resolves when the layout has been applied and nodes have been restored.
  */
-async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy, customLayout) {
+async function resolveCompoundNodesOverlap(
+  supportCy,
+  layoutBy,
+  groupLayoutBy,
+  customLayout
+) {
   const elementUtilities = require("./elementUtilities")(supportCy);
   const nodesByGroupLevels = getNodesByGroupLevels(supportCy);
 
@@ -341,10 +437,7 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy, c
         if (node.isNode() && node.data().type === "group") {
           isAnyNodeGroup = true;
         }
-        if (
-          !node.hasClass("cy-expand-collapse-collapsed-node") &&
-          node.isParent()
-        ) {
+        if (node.data("type") === "group" && node.isParent()) {
           const positioningSupportNodeId = `support ${node.data().id}`;
           const positioningSupportNode = {
             group: "nodes",
@@ -428,195 +521,183 @@ async function resolveCompoundNodesOverlap(supportCy, layoutBy, groupLayoutBy, c
 
       // Move the children of the removed nodes to their parent positions
       removedCollection.forEach((removedNode) => {
-        if (
-          removedNode.group() !== "edges" ||
-          removedNode.data()?.type === "default"
-        ) {
-          const positioningSupportNodeId = `support ${removedNode.data().id}`;
+        if (removedNode?.data("type") === "group" && removedNode?.isParent()) {
           const positioningSupportNode = supportCy.getElementById(
-            positioningSupportNodeId
+            `support ${removedNode.data().id}`
           );
           if (positioningSupportNode?.length) {
-            // Determine the multiplier based on the relative positions of removedNode and positioningSupportNode
-            const multiplier = {
-              x:
-                removedNode.position().x < positioningSupportNode.position().x
-                  ? 1
-                  : -1,
-              y:
-                removedNode.position().y < positioningSupportNode.position().y
-                  ? 1
-                  : -1,
-            };
-
-            // Calculate the difference in positions, adjusted by the multiplier
-            const positionDiff = {
-              x:
-                multiplier.x === 1
-                  ? positioningSupportNode.position().x -
-                    removedNode.position().x
-                  : (removedNode.position().x -
-                      positioningSupportNode.position().x) *
-                    -1,
-              y:
-                multiplier.y === 1
-                  ? positioningSupportNode.position().y -
-                    removedNode.position().y
-                  : (removedNode.position().y -
-                      positioningSupportNode.position().y) *
-                    -1,
-            };
-
-            // Move the children of removedNode by the calculated position difference
-            elementUtilities.moveNodes(
-              positionDiff,
-              removedNode.children(),
-              undefined
+            elementUtilities.moveCompoundNode(
+              removedNode,
+              removedNode.position(),
+              positioningSupportNode.position()
             );
           }
         }
       });
-      // remove support nodes
+      // remove support nodes after moving actual nodes
       positioningSupportCollection.remove();
     }
   }
 }
 
-function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
+function adjustDagreLayoutWithSeparation(cy) {
   const elementUtilities = require("./elementUtilities")(cy);
   const nodesByGroupLevels = getNodesByGroupLevels(cy);
+  const customLayout =
+    cy.scratch("_cyExpandCollapse")?.tempOptions?.customLayout;
+  const originalRankDir =
+    cy.scratch("_cyExpandCollapse")?.tempOptions?.groupLayoutBy?.rankDir;
+  const originalNodeSep =
+    cy.scratch("_cyExpandCollapse")?.tempOptions?.groupLayoutBy?.nodeSep;
+  const originalRankSep =
+    cy.scratch("_cyExpandCollapse")?.tempOptions?.groupLayoutBy?.rankSep;
+  let rankDir = originalRankDir;
+  let nodeSep = originalNodeSep;
+  let rankSep = originalRankSep;
 
-  cy.nodes().forEach((node) => {
-    if (node.data("type") === "group" && node.isParent()) {
-      node.toggleClass("support-expanded", true);
-    }
-  });
-
-  const rowMaps = [];
+  const levelMaps = [];
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
-    rowMaps[i] = []; // Initialize the inner array for each level
+    levelMaps[i] = []; // Initialize the inner array for each level
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
       const nodes = nodesByGroupLevels[i].items[j];
-      // Group the nodes by their original y-coordinate (rows)
-      const rowMap = new Map();
+      const groupLevel = nodesByGroupLevels[i].level;
+
+      if (customLayout && groupLevel === 3) {
+        rankDir === "TB" ? "LR" : "TB";
+      } else {
+        rankDir = originalRankDir;
+      }
+      // Group the nodes by their original coordinate (y for TB, x for LR)
+      const coordMap = new Map();
       nodes.forEach((node) => {
-        const y = node.position("y");
-        if (!rowMap.has(y)) {
-          rowMap.set(y, []);
+        const coord =
+          rankDir === "TB" ? node.position("y") : node.position("x");
+        if (!coordMap.has(coord)) {
+          coordMap.set(coord, []);
         }
-        rowMap.get(y).push(node);
+        coordMap.get(coord).push(node);
       });
-      rowMaps[i][j] = rowMap;
+      levelMaps[i][j] = coordMap;
     }
   }
 
   for (let i = 0; i < nodesByGroupLevels.length; i++) {
     for (let j = 0; j < nodesByGroupLevels[i].items.length; j++) {
-      // Group the nodes by their original y-coordinate (rows)
-      const rowMap = rowMaps[i][j];
+      const groupLevel = nodesByGroupLevels[i].level;
 
-      // Convert to sorted array of rows
-      const sortedRows = Array.from(rowMap.entries()).sort(
+      if (customLayout && groupLevel === 3) {
+        rankDir === "TB" ? "LR" : "TB";
+        nodeSep = 10;
+        rankSep = 10;
+      } else {
+        rankDir = originalRankDir;
+        nodeSep = originalNodeSep;
+        rankSep = originalRankSep;
+      }
+      const coordMap = levelMaps[i][j];
+
+      // Convert to sorted array of levels (rows or columns)
+      const sortedLevels = Array.from(coordMap.entries()).sort(
         (a, b) => a[0] - b[0]
       );
 
-      // Adjust positioning for each row
-      sortedRows.forEach((currentRowData, rowIndex) => {
-        const currentRowNodes = currentRowData[1];
+      // Adjust positioning for each level
+      sortedLevels.forEach((currentLevelData, levelIndex) => {
+        const currentLevelNodes = currentLevelData[1];
 
-        // Calculate total width needed for this row
-        const totalWidth = currentRowNodes.reduce((sum, node) => {
-          const nodeWidth =
-            node.data().type !== "group" ? node.width() : node.boundingBox().w;
-          return sum + nodeWidth;
+        // Calculate total dimension needed for this level (width for TB, height for LR)
+        const totalDimension = currentLevelNodes.reduce((sum, node) => {
+          const nodeDimension =
+            node.data().type !== "group"
+              ? rankDir === "TB"
+                ? node.width()
+                : node.height()
+              : rankDir === "TB"
+              ? node.boundingBox().w
+              : node.boundingBox().h;
+          return sum + nodeDimension;
         }, 0);
-        const totalSeparation = (currentRowNodes.length - 1) * nodeSep;
+        const totalSeparation = (currentLevelNodes.length - 1) * nodeSep;
 
-        // Starting x position to center the row
-        let currentX = -((totalWidth + totalSeparation) / 2);
+        // Starting position to center the level
+        let currentStartCoord = -((totalDimension + totalSeparation) / 2);
 
-        // Determine y-position
-        let currentRowY;
-        if (rowIndex === 0) {
-          // For first row, use original y-coordinate
-          currentRowY = currentRowData[0];
+        // Determine main coordinate (y for TB, x for LR)
+        let currentMainCoord;
+        if (levelIndex === 0) {
+          // For first level, use original coordinate
+          currentMainCoord = currentLevelData[0];
         } else {
-          const prevRowData = sortedRows[rowIndex - 1];
-          const prevRowNodes = prevRowData[1];
+          const prevLevelData = sortedLevels[levelIndex - 1];
+          const prevLevelNodes = prevLevelData[1];
 
-          // Calculate max bottom of previous row
-          const maxPrevRowBottom = Math.max(
-            ...prevRowNodes.map(
+          // Calculate max end of previous level
+          const maxPrevLevelEnd = Math.max(
+            ...prevLevelNodes.map(
               (node) =>
                 (node.data().type !== "group"
-                  ? node.height()
-                  : node.boundingBox().h) / 2
+                  ? rankDir === "TB"
+                    ? node.height()
+                    : node.width()
+                  : rankDir === "TB"
+                  ? node.boundingBox().h
+                  : node.boundingBox().w) / 2
             )
           );
 
-          // Calculate max top of current row
-          const maxCurrentRowTop = Math.max(
-            ...currentRowNodes.map(
+          // Calculate max start of current level
+          const maxCurrentLevelStart = Math.max(
+            ...currentLevelNodes.map(
               (node) =>
                 (node.data().type !== "group"
-                  ? node.height()
-                  : node.boundingBox().h) / 2
+                  ? rankDir === "TB"
+                    ? node.height()
+                    : node.width()
+                  : rankDir === "TB"
+                  ? node.boundingBox().h
+                  : node.boundingBox().w) / 2
             )
           );
 
-          // Calculate current row's new y-position
-          currentRowY =
-            prevRowNodes[0].position("y") +
-            maxPrevRowBottom +
+          // Calculate current level's new main coordinate
+          currentMainCoord =
+            (rankDir === "TB"
+              ? prevLevelNodes[0].position("y")
+              : prevLevelNodes[0].position("x")) +
+            maxPrevLevelEnd +
             rankSep +
-            maxCurrentRowTop;
+            maxCurrentLevelStart;
         }
 
-        // Position nodes in the current row
-        currentRowNodes.forEach((node) => {
-          const nodeWidth =
-            node.data().type !== "group" ? node.width() : node.boundingBox().w;
+        // Position nodes in the current level
+        currentLevelNodes.forEach((node) => {
+          const nodeDimension =
+            node.data().type !== "group"
+              ? rankDir === "TB"
+                ? node.width()
+                : node.height()
+              : rankDir === "TB"
+              ? node.boundingBox().w
+              : node.boundingBox().h;
 
-          if (
-            !node.hasClass("cy-expand-collapse-collapsed-node") &&
-            node.isParent()
-          ) {
-            const oldPosition = node.position();
-            const newPosition = {
-              x: currentX + nodeWidth / 2,
-              y: currentRowY,
-            };
-            const multiplier = {
-              x: oldPosition.x < newPosition.x ? 1 : -1,
-              y: oldPosition.y < newPosition.y ? 1 : -1,
-            };
-
-            // Calculate the difference in positions, adjusted by the multiplier
-            const positionDiff = {
-              x:
-                multiplier.x === 1
-                  ? newPosition.x - oldPosition.x
-                  : (oldPosition.x - newPosition.x) * -1,
-              y:
-                multiplier.y === 1
-                  ? newPosition.y - oldPosition.y
-                  : (oldPosition.y - newPosition.y) * -1,
-            };
-
-            elementUtilities.moveNodes(
-              positionDiff,
-              node.children(),
-              undefined
-            );
+          const newPosition = {};
+          if (rankDir === "TB") {
+            newPosition.x = currentStartCoord + nodeDimension / 2;
+            newPosition.y = currentMainCoord;
           } else {
-            node.position({
-              x: currentX + nodeWidth / 2,
-              y: currentRowY,
-            });
+            newPosition.x = currentMainCoord;
+            newPosition.y = currentStartCoord + nodeDimension / 2;
           }
 
-          // Move currentX for next node
-          currentX += nodeWidth + nodeSep;
+          if (node.data("type") === "group" && node.isParent()) {
+            const oldPosition = node.position();
+            elementUtilities.moveCompoundNode(node, oldPosition, newPosition);
+          } else {
+            node.position(newPosition);
+          }
+
+          // Move currentStartCoord for next node
+          currentStartCoord += nodeDimension + nodeSep;
         });
       });
     }
@@ -626,6 +707,9 @@ function adjustDagreLayoutWithSeparation(cy, nodeSep = 100, rankSep = 100) {
 module.exports = {
   runLayoutAsync,
   resolveCompoundNodesOverlap,
-  getCiseClusterNodesExisitingInMap,
   adjustDagreLayoutWithSeparation,
+  getNodesByGroupLevels,
+  handleLayoutWithoutGroups,
+  handleNonDagreLayoutWithGroups,
+  handleDagreLayoutWithGroups,
 };

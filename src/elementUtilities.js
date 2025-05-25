@@ -1,9 +1,7 @@
-var { repairEdges, restoreEdges } = require("./edgeUtilities");
-var getSupportCy = require("./getSupportCy");
 var {
-  runLayoutAsync,
-  getCiseClusterNodesExisitingInMap,
-  adjustDagreLayoutWithSeparation,
+  handleLayoutWithoutGroups,
+  handleNonDagreLayoutWithGroups,
+  handleDagreLayoutWithGroups,
 } = require("./layoutUtilities");
 
 function elementUtilities(cy) {
@@ -26,8 +24,8 @@ function elementUtilities(cy) {
         this.moveNodes(positionDiff, children, true);
       }
     },
+
     getTopMostNodes: function (nodes) {
-      //*//
       var nodesMap = {};
       for (var i = 0; i < nodes.length; i++) {
         nodesMap[nodes[i].id()] = true;
@@ -49,125 +47,50 @@ function elementUtilities(cy) {
 
       return roots;
     },
-    rearrange: async function (layoutBy, layoutHandler) {
-      if (layoutBy) {
-        var hasGroupsNodes = !!cy
-          .nodes()
-          .some((node) => node.data().type === "group");
 
-        if (hasGroupsNodes) {
-          if (
-            cy?.scratch("_cyExpandCollapse")?.options?.groupLayoutBy?.name !==
-            "dagre"
-          ) {
-            const positions = {};
-            (cy?.scratch("_cyExpandCollapse")?.positions ?? []).forEach(
-              ({ nodeId, position }) => {
-                positions[nodeId] = position;
-              }
-            );
+    moveCompoundNode: function (node, oldPosition, newPosition) {
+      var multiplier = {
+        x: oldPosition.x < newPosition.x ? 1 : -1,
+        y: oldPosition.y < newPosition.y ? 1 : -1,
+      };
 
-            // run preset layout with the positions
-            await runLayoutAsync(
-              cy.layout({
-                name: "preset",
-                fit: !!layoutBy?.fit,
-                positions: positions,
-                padding: layoutBy?.padding ?? 50,
-                animate: !!layoutBy?.animate,
-                animationDuration: layoutBy?.animationDuration ?? 500,
-                animationEasing: layoutBy?.animationEasing,
-              })
-            );
-          } else {
-            var finalPositions =
-              cy?.scratch("_cyExpandCollapse")?.finalPositions ?? {};
+      // Calculate the difference in positions, adjusted by the multiplier
+      var positionDiff = {
+        x:
+          multiplier.x === 1
+            ? newPosition.x - oldPosition.x
+            : (oldPosition.x - newPosition.x) * -1,
+        y:
+          multiplier.y === 1
+            ? newPosition.y - oldPosition.y
+            : (oldPosition.y - newPosition.y) * -1,
+      };
 
-            //run support map preset layout with the position of all nodes when all groups are expanded
-            var supportCy = getSupportCy(cy);
-            await runLayoutAsync(
-              supportCy.layout({
-                name: "preset",
-                fit: !!layoutBy?.fit,
-                positions: finalPositions,
-                padding: layoutBy?.padding ?? 50,
-                animate: false,
-              })
-            );
-
-            // adjust seperation between nodes in support map since few group nodes might be collapsed
-            adjustDagreLayoutWithSeparation(supportCy, 100, 100);
-
-            // store support map nodes final positions
-            var supportFinalPositions = {};
-            supportCy.nodes().map((node) => {
-              supportFinalPositions[node.id()] = {
-                x: node.position("x"),
-                y: node.position("y"),
-              };
-            });
-
-            // run preset layout with the supportFinalpositions on main map
-            await runLayoutAsync(
-              cy.layout({
-                name: "preset",
-                fit: !!layoutBy?.fit,
-                positions: supportFinalPositions,
-                padding: layoutBy?.padding ?? 50,
-                animate: !!layoutBy?.animate,
-                animationDuration: layoutBy?.animationDuration ?? 500,
-                animationEasing: layoutBy?.animationEasing,
-              })
-            );
-
-            supportCy.destroy();
-          }
-        } else {
-          // clusters of CISE layout
-
-          var supportCy = getSupportCy(cy);
-
-          repairEdges(supportCy);
-
-          var ciseClusters = getCiseClusterNodesExisitingInMap(
-            supportCy,
-            layoutBy?.clusters ?? []
-          );
-          await runLayoutAsync(
-            supportCy.layout({ ...layoutBy, clusters: ciseClusters })
-          );
-
-          // store support map nodes final positions
-          var supportFinalPositions = {};
-          supportCy.nodes().map((node) => {
-            supportFinalPositions[node.id()] = {
-              x: node.position("x"),
-              y: node.position("y"),
-            };
-          });
-
-          // run preset layout with the supportFinalpositions on main map
-          await runLayoutAsync(
-            cy.layout({
-              name: "preset",
-              fit: !!layoutBy?.fit,
-              positions: supportFinalPositions,
-              padding: layoutBy?.padding ?? 50,
-              animate: !!layoutBy?.animate,
-              animationDuration: layoutBy?.animationDuration ?? 500,
-              animationEasing: layoutBy?.animationEasing,
-            })
-          );
-
-          supportCy.destroy();
-        }
-
-        if (layoutHandler) {
-          layoutHandler?.();
-        }
-        cy.scratch("_cyExpandCollapse").positions = null;
-      }
+      this.moveNodes(positionDiff, node.children(), undefined);
     },
+
+    rearrange: async function () {
+      var expandCollapseOptions =
+        cy.scratch("_cyExpandCollapse")?.tempOptions ?? {};
+      var hasGroupNodes = cy
+        .nodes()
+        .some((node) => node.data("type") === "group");
+      var isDagreLayout =
+        expandCollapseOptions?.groupLayoutBy?.name === "dagre";
+      var layoutHandler = expandCollapseOptions?.layoutHandler;
+
+      if (hasGroupNodes) {
+        await (isDagreLayout
+          ? handleDagreLayoutWithGroups(cy)
+          : handleNonDagreLayoutWithGroups(cy, expandCollapseOptions));
+      } else {
+        await handleLayoutWithoutGroups(cy, expandCollapseOptions);
+      }
+
+      layoutHandler?.();
+      cy.scratch("_cyExpandCollapse").positions = null;
+    },
+
     convertToRenderedPosition: function (modelPosition) {
       var pan = cy.pan();
       var zoom = cy.zoom();

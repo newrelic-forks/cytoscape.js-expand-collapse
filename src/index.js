@@ -10,10 +10,7 @@
     var cueUtilities = require("./cueUtilities");
     var getSupportCy = require("./getSupportCy");
     var { repairEdges } = require("./edgeUtilities");
-    var {
-      resolveCompoundNodesOverlap,
-      getCiseClusterNodesExisitingInMap,
-    } = require("./layoutUtilities");
+    var { resolveCompoundNodesOverlap } = require("./layoutUtilities");
     var saveLoadUtils = null;
 
     function extendOptions(options, extendBy) {
@@ -82,14 +79,9 @@
         var layoutBy = getScratch(cy, "options").layoutBy;
         var groupLayoutBy = getScratch(cy, "options").groupLayoutBy;
         var customLayout = getScratch(cy, "options").customLayout;
-        // clusters of CISE layout
-        var ciseClusters = getCiseClusterNodesExisitingInMap(
-          supportCy,
-          layoutBy?.clusters ?? []
-        );
 
         repairEdges(supportCy);
-
+        
         supportCy.nodes().forEach((node) => {
           if (node.data("type") === "group" && node.isParent()) {
             node.toggleClass("support-expanded", true);
@@ -101,10 +93,9 @@
           supportCy,
           {
             ...layoutBy,
-            clusters: ciseClusters,
             animate: false,
           },
-          { ...groupLayoutBy, clusters: ciseClusters, animate: false },
+          { ...groupLayoutBy, animate: false },
           customLayout
         );
 

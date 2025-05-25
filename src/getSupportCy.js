@@ -1,7 +1,6 @@
 const cytoscape = require("cytoscape");
 const fcose = require("cytoscape-fcose");
 const dagre = require("cytoscape-dagre");
-const cise = require("cytoscape-cise");
 
 /**
  * Creates a new support cytoscape instance with the same elements and style as the provided instance,
@@ -19,7 +18,6 @@ function getSupportCy(cy) {
 
   cytoscape.use(fcose);
   cytoscape.use(dagre);
-  cytoscape.use(cise);
 
   const supportCyStyle = cyJson.style.map((item) => {
     const newItem = { ...item };
