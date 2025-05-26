@@ -10,10 +10,7 @@
     var cueUtilities = require("./cueUtilities");
     var getSupportCy = require("./getSupportCy");
     var { repairEdges } = require("./edgeUtilities");
-    var {
-      resolveCompoundNodesOverlap,
-      getCiseClusterNodesExisitingInMap,
-    } = require("./layoutUtilities");
+    var { resolveCompoundNodesOverlap } = require("./layoutUtilities");
     var saveLoadUtils = null;
 
     function extendOptions(options, extendBy) {
@@ -81,15 +78,10 @@
         // Get the layout options from the scratchpad
         var layoutBy = getScratch(cy, "options").layoutBy;
         var groupLayoutBy = getScratch(cy, "options").groupLayoutBy;
-
-        // clusters of CISE layout
-        var ciseClusters = getCiseClusterNodesExisitingInMap(
-          supportCy,
-          layoutBy?.clusters ?? []
-        );
+        var customLayout = getScratch(cy, "options").customLayout;
 
         repairEdges(supportCy);
-
+        
         supportCy.nodes().forEach((node) => {
           if (node.data("type") === "group" && node.isParent()) {
             node.toggleClass("support-expanded", true);
@@ -101,10 +93,10 @@
           supportCy,
           {
             ...layoutBy,
-            clusters: ciseClusters,
             animate: false,
           },
-          { ...groupLayoutBy, clusters: ciseClusters, animate: false }
+          { ...groupLayoutBy, animate: false },
+          customLayout
         );
 
         var positions = supportCy.nodes().map((node) => ({
@@ -757,6 +749,7 @@
         zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
         layoutHandler: function () {}, // layout function to be called after expand/collapse
         allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
+        customLayout: false, // whether to use custom layout
         shouldSaveFinalPositions: false, // whether to save final positions of all nodes; when all groups are expanded
       };
 
