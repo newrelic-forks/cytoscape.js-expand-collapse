@@ -268,30 +268,6 @@ function getEdgeOutermostId(id, parentId, cy) {
 }
 
 /**
- * Recursively retrieves the innermost child nodes of a given node in a Cytoscape instance.
- *
- * @param {string} id - The ID of the node to start the search from.
- * @param {Object} cy - The Cytoscape instance.
- * @returns {Object} A collection of the innermost child nodes.
- */
-function getInnerMostChildNodes(id, cy) {
-  const node = cy.getElementById(id);
-  const childNodes = node.children();
-  let nonExpandedChildNodes = cy.collection();
-
-  childNodes.forEach((childNode) => {
-    if (childNode.data("type") === "group" && childNode.isParent()) {
-      nonExpandedChildNodes = nonExpandedChildNodes.union(
-        getInnerMostChildNodes(childNode.id(), cy)
-      );
-    } else {
-      nonExpandedChildNodes = nonExpandedChildNodes.union(childNode);
-    }
-  });
-  return nonExpandedChildNodes;
-}
-
-/**
  * Retrieves the edges of support expanded groups within a Cytoscape instance.
  *
  * @param {Array} groupLevelNodes - An array of group level nodes.
@@ -307,7 +283,8 @@ function getSupportExpandedGroupsEdges(groupLevelNodes, cy) {
   const supportExpandedGroupsEdges = new Map();
   expandedGroupNodes.forEach((node) => {
     const parentId = node.data().parent;
-    const childNodes = getInnerMostChildNodes(node.id(), cy);
+    const childNodes = node.descendants();
+    childNodes.push(node);
     const childNodeIds = new Set();
     childNodes.forEach((childNode) => {
       childNodeIds.add(childNode.data().id);
