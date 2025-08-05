@@ -12,7 +12,9 @@ const dagre = require("cytoscape-dagre");
 function getSupportCy(cy) {
   const cyJson = cy.json();
 
-  let cont = document.getElementById("support-map");
+  let cont = document.getElementById(
+    cy.scratch("_cyExpandCollapse")?.options?.supportMapId
+  );
   cont.style.width = cy.container().clientWidth + "px";
   cont.style.height = cy.container().clientHeight + "px";
 

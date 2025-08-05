@@ -81,7 +81,7 @@
         var customLayout = getScratch(cy, "options").customLayout;
 
         repairEdges(supportCy);
-        
+
         supportCy.nodes().forEach((node) => {
           if (node.data("type") === "group" && node.isParent()) {
             node.toggleClass("support-expanded", true);
@@ -706,14 +706,14 @@
       var targetElement = document.querySelector(
         ".map.__________cytoscape_container"
       );
-      var supportMapElement = document.getElementById("support-map");
+      var supportMapElement = document.getElementById(opts?.supportMapId);
 
       if (targetElement && !supportMapElement) {
         // Create a new div element
         var newElement = document.createElement("div");
 
         // Set the id attribute
-        newElement.id = "support-map";
+        newElement.id = opts?.supportMapId;
 
         // Set the style properties
         newElement.style.zIndex = -1;
@@ -751,6 +751,7 @@
         allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
         customLayout: false, // whether to use custom layout
         shouldSaveFinalPositions: false, // whether to save final positions of all nodes; when all groups are expanded
+        supportMapId: "",
       };
 
       // If opts is not 'get' that is it is a real options object then initilize the extension
