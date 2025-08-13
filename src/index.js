@@ -160,7 +160,8 @@
 
         await supportExpandCollapseUtilities.simpleExpandAllNodes(
           undefined,
-          false
+          false,
+          true
         );
 
         await supportEndOperation(supportCy);
@@ -333,13 +334,12 @@
         var tempOptions = extendOptions(options, opts);
         evalOptions(tempOptions);
 
-        var groupNodes = cy.nodes().filter((node) => {
-          return node.data().type === "group";
-        });
-
         setScratch(cy, "tempOptions", tempOptions);
 
-        const result = await this.expandRecursively(groupNodes, tempOptions);
+        const result = await this.expandRecursively(
+          this.expandableNodes(),
+          tempOptions
+        );
 
         return result;
       };
@@ -751,6 +751,7 @@
         allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
         customLayout: false, // whether to use custom layout
         shouldSaveFinalPositions: false, // whether to save final positions of all nodes; when all groups are expanded
+        avoidExpandingClusters: true, // whether to include clusters in the expandAll operation
         supportMapId: "",
       };
 

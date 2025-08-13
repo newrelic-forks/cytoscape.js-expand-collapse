@@ -90,7 +90,11 @@ function expandCollapseUtilities(cy) {
     /*
      * Expands all nodes by expanding all top most nodes top down with their descendants.
      */
-    simpleExpandAllNodes: async function (nodes, applyFishEyeViewToEachNode) {
+    simpleExpandAllNodes: async function (
+      nodes,
+      applyFishEyeViewToEachNode,
+      avoidExpandingClusters = true
+    ) {
       if (nodes === undefined) {
         nodes = cy.nodes();
       }
@@ -102,7 +106,8 @@ function expandCollapseUtilities(cy) {
         await this.expandAllTopDown(
           root,
           expandStack,
-          applyFishEyeViewToEachNode
+          applyFishEyeViewToEachNode,
+          avoidExpandingClusters
         );
       }
       return expandStack;
@@ -141,7 +146,8 @@ function expandCollapseUtilities(cy) {
     expandAllNodes: async function (nodes, options) {
       var expandedStack = await this.simpleExpandAllNodes(
         nodes,
-        options?.fisheye
+        options?.fisheye,
+        options?.avoidExpandingClusters
       );
 
       await this.endOperation(nodes);
@@ -157,12 +163,12 @@ function expandCollapseUtilities(cy) {
     expandAllTopDown: async function (
       root,
       expandStack,
-      applyFishEyeViewToEachNode
+      applyFishEyeViewToEachNode,
+      avoidExpandingClusters = true
     ) {
-      if (
-        root._private.data.collapsedChildren != null &&
-        root.data().type !== "cluster"
-      ) {
+      var shouldExpandRoot =
+        root.data().type === "cluster" ? !avoidExpandingClusters : true;
+      if (root._private.data.collapsedChildren != null && shouldExpandRoot) {
         expandStack.push(root);
         await this.expandNode(root, applyFishEyeViewToEachNode);
       }
