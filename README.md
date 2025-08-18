@@ -1,10 +1,8 @@
-# cytoscape-expand-collapse
-
-**We are in the process of developing a new unified framework for complexity management of graphs. Thus this repositoy is no longer being maintained**
+# nr-cytoscape-expand-collapse
 
 ## Description
 
-This extension provides an interface to expand/collapse nodes and edges for better management of complexity of Cytoscape.js compound graphs, distributed under [The MIT License](https://opensource.org/licenses/MIT).
+This library provides an interface to expand/collapse nodes and edges for better management of complexity of Cytoscape.js compound graphs.
 
 <p align="center">
   <img src="expand-collapse-extension-demo.gif" height="240"/>
@@ -12,18 +10,17 @@ This extension provides an interface to expand/collapse nodes and edges for bett
   <img src="expand-collapse-extension-edge-demo.gif" height="240"/>
 </p>
 
-Please cite the following paper when using this extension:
-
-U. Dogrusoz , A. Karacelik, I. Safarli, H. Balci, L. Dervishi, and M.C. Siper, "[Efficient methods and readily customizable libraries for managing complexity of large networks](https://doi.org/10.1371/journal.pone.0197238)", PLoS ONE, 13(5): e0197238, 2018.
+Please cite the following paper when using this library:
+[Efficient methods and readily customizable libraries for managing complexity of large networks](https://doi.org/10.1371/journal.pone.0197238)
 
 ## Demo
 
 Here are some demos: **no undo and with custom cue image**, **undoable**, and **collapsing edges and nodes**, respectively:
 
 <p align="center">
-<a href="https://ivis-at-bilkent.github.io/cytoscape.js-expand-collapse/demo/demo.html" title="No undo and with custom cue image"><img src="https://www.cs.bilkent.edu.tr/~ivis/images/demo1.png" height=42px></a> &emsp;
-<a href="https://ivis-at-bilkent.github.io/cytoscape.js-expand-collapse/demo/demo-undoable.html" title="Undoable"><img src="https://www.cs.bilkent.edu.tr/~ivis/images/demo2.png" height=42px></a> &emsp;
-<a href="https://ivis-at-bilkent.github.io/cytoscape.js-expand-collapse/demo/demo-compounds-collapsed.html" title="Collapsing edges and nodes"><img src="https://www.cs.bilkent.edu.tr/~ivis/images/demo3.png" height=42px></a>
+<a href="https://ivis-at-bilkent.github.io/cytoscape.js-expand-collapse/demo/demo.html" title="No undo and with custom cue image" style="color: #0366d6; font-weight: bold; text-decoration: underline;">Demo with custom cue image</a> &emsp;
+<a href="https://ivis-at-bilkent.github.io/cytoscape.js-expand-collapse/demo/demo-undoable.html" title="Undoable" style="color: #28a745; font-weight: bold; text-decoration: underline;">Undoable demo</a> &emsp;
+<a href="https://ivis-at-bilkent.github.io/cytoscape.js-expand-collapse/demo/demo-compounds-collapsed.html" title="Collapsing edges and nodes" style="color: #f9826c; font-weight: bold; text-decoration: underline;">Collapsing edges and nodes demo</a>
 </p>
 
 ## API
@@ -44,11 +41,17 @@ Collapse given nodes, extend options with given param.
 `api.collapseRecursively(nodes, options)`
 Collapse given nodes recursively, extend options with given param.
 
+`api.collapseCluster(nodeIds, clusterId, clusterColorClassesPriorities, opts)`
+Collapse given nodes in the given cluster
+
 `api.collapseAll(options)`
 Collapse all nodes on graph (recursively), extend options with given param.
 
 `api.expand(nodes, options)`
 Expand given nodes, extend options with given param.
+
+`api.expandCluster(nodeIds, clusterId, clusterColorClassesPriorities, opts)`
+Expand given nodes in the given cluster
 
 `api.expandRecursively(nodes, options)`
 Expand given nodes recursively, extend options with given param.
@@ -142,17 +145,12 @@ Notice that following events are performed for _each_ node that is collapsed/exp
 
 `cy.edges().on("expandcollapse.afterexpandedge", function(event) { var edge = this; ... })` Triggered after an edge is expanded
 
-All these events can also be listened as [cytoscape.js core events](https://js.cytoscape.org/#cy.on)
-e.g.
-
-`cy.on("expandcollapse.afterexpandedge", function(event) { var elem = event.target; ... })`
-
 ## Default Options
 
 ```javascript
 var options = {
-  layoutBy: null, // to rearrange after expand/collapse. It's just layout options or whole layout function. Choose your side!
-  // recommended usage: use cose-bilkent layout with randomize: false to preserve mental map upon expand/collapse
+  layoutBy: null, // for rearrange after expand/collapse. It's just layout options or whole layout function. Choose your side!
+  groupLayoutBy: null, // for rearrange group nodes after expand/collapse. It's just layout options or whole layout function. Choose your side!
   fisheye: true, // whether to perform fisheye view after expand/collapse you can specify a function too
   animate: true, // whether to animate on drawing changes you can specify a function too
   animationDuration: 1000, // when animate is true, the duration in milliseconds of the animation
@@ -166,10 +164,17 @@ var options = {
   expandCueImage: undefined, // image of expand icon if undefined draw regular expand cue
   collapseCueImage: undefined, // image of collapse icon if undefined draw regular collapse cue
   expandCollapseCueSensitivity: 1, // sensitivity of expand-collapse cues
-  edgeTypeInfo: "edgeType", // the name of the field that has the edge type, retrieved from edge.data(), can be a function, if reading the field returns undefined the collapsed edge type will be "unknown"
-  groupEdgesOfSameTypeOnCollapse: false, // if true, the edges to be collapsed will be grouped according to their types, and the created collapsed edges will have same type as their group. if false the collapased edge will have "unknown" type.
-  allowNestedEdgeCollapse: true, // when you want to collapse a compound edge (edge which contains other edges) and normal edge, should it collapse without expanding the compound first
+
+  edgeTypeInfo: "edgeType", //the name of the field that has the edge type, retrieved from edge.data(), can be a function
+  groupEdgesOfSameTypeOnCollapse: false,
+  allowNestedEdgeCollapse: true,
   zIndex: 999, // z-index value of the canvas in which cue ımages are drawn
+  layoutHandler: function () {}, // layout function to be called after expand/collapse
+  allowReArrangeLayout: true, // whether to rearrange layout after expand/collapse
+  customLayout: false, // whether to use custom layout
+  shouldSaveFinalPositions: false, // whether to save final positions of all nodes; when all groups are expanded
+  avoidExpandingClusters: true, // whether to include clusters in the expandAll operation
+  supportMapId: "",
 };
 ```
 
@@ -213,16 +218,15 @@ var options = {
 ## Dependencies
 
 - Cytoscape.js ^3.3.0
-- cytoscape-undo-redo.js(optional) ^1.0.1
-- cytoscape-cose-bilkent.js(optional/suggested for layout after expand/collapse) ^4.0.0
+- cytoscape-dagre ^2.5.0
+- cytoscape-fcose ^2.2.0
 
 ## Usage instructions
 
 Download the library:
 
-- via npm: `npm install cytoscape-expand-collapse`,
-- via bower: `bower install cytoscape-expand-collapse`, or
-- via direct download in the repository (probably from a tag).
+- via npm: `npm install nr-cytoscape-expand-collapse`,
+- via bower: `bower install nr-cytoscape-expand-collapse`, or
 
 `require()` the library as appropriate for your project:
 
@@ -255,19 +259,13 @@ Plain HTML/JS has the extension registered for you automatically, because no `re
 
 ## Publishing instructions
 
-This project is set up to automatically be published to npm and bower. To publish:
+To publish:
 
 1. Build the extension : `npm run build`
-1. Commit the build : `git commit -am "Build for release"`
-1. Bump the version number and tag: `npm version major|minor|patch`
-1. Push to origin: `git push && git push --tags`
-1. Publish to npm: `npm publish .`
-1. If publishing to bower for the first time, you'll need to run `bower register cytoscape-expand-collapse https://github.com/iVis-at-Bilkent/cytoscape.js-expand-collapse.git`
-
-## Team
-
-- [Hasan Balci](https://github.com/hasanbalci), [Yusuf Canbaz](https://github.com/canbax), [Ugur Dogrusoz](https://github.com/ugurdogrusoz) of [i-Vis at Bilkent University](http://www.cs.bilkent.edu.tr/~ivis) and [Metin Can Siper](https://github.com/metincansiper) of the Demir Lab at [OHSU](http://www.ohsu.edu/)
-
-## Alumni
-
-- [Alper Karacelik](https://github.com/alperkaracelik), [Ilkin Safarli](https://github.com/kinimesi), [Nasim Saleh](https://github.com/nasimsaleh), [Selim Firat Yilmaz](https://github.com/mrsfy)
+1. Bump the version number in package.json
+1. Bump the version number in package-lock.json `npm i`
+1. Stage the changes: `git add .`
+1. Commit the build : `git commit -m "your-commit-msg"`
+1. Push to origin: `git push origin HEAD`
+1. login to npm : `npm login`
+1. Publish to npm: `npm publish`
